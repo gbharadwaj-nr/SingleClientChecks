@@ -2,17 +2,44 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ client_name }} - AWS Daily Health Check</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header class="report-header">
-        <img src="logos/{{ client_logo }}" alt="{{ client_name }} logo" class="logo">
-        <div>
-            <h1>{{ client_name }} - AWS Daily Health Check</h1>
-            <p class="report-meta">Generated: {{ generated_at }} | Account: {{ account_id }}</p>
+        <div class="report-header__brand">
+            <img src="logos/{{ client_logo }}" alt="{{ client_name }}"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+            <span class="logo-fallback">{{ client_name }}</span>
+        </div>
+        <div class="report-header__title">
+            <h1>{{ client_name }} &mdash; AWS Daily Health Check</h1>
+            <p class="report-meta">Generated {{ generated_at }} &middot; Account {{ account_id }}</p>
+        </div>
+        <div class="status-banner status-banner--{{ 'healthy' if overall_status == 'HEALTHY' else 'unhealthy' }}">
+            {{ overall_status }}
         </div>
     </header>
+
+    <div class="summary-bar">
+        <div class="summary-card summary-card--total">
+            <span class="summary-card__value">{{ summary.total }}</span>
+            <span class="summary-card__label">Total Checks</span>
+        </div>
+        <div class="summary-card summary-card--ok">
+            <span class="summary-card__value">{{ summary.passed }}</span>
+            <span class="summary-card__label">Passing</span>
+        </div>
+        <div class="summary-card summary-card--warning">
+            <span class="summary-card__value">{{ summary.warning }}</span>
+            <span class="summary-card__label">Not Configured</span>
+        </div>
+        <div class="summary-card summary-card--error">
+            <span class="summary-card__value">{{ summary.failed }}</span>
+            <span class="summary-card__label">Failing</span>
+        </div>
+    </div>
 
     <main>
         {% for section in sections %}
@@ -30,7 +57,11 @@
                     {% for row in section.rows %}
                     <tr class="status-{{ row.status | default('ok') }}">
                         {% for cell in row.cells %}
+                        {% if loop.last %}
+                        <td><span class="badge badge--{{ row.status | default('ok') }}">{{ cell }}</span></td>
+                        {% else %}
                         <td>{{ cell }}</td>
+                        {% endif %}
                         {% endfor %}
                     </tr>
                     {% endfor %}
@@ -45,3 +76,4 @@
     </footer>
 </body>
 </html>
+

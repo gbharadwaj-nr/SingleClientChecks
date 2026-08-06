@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 60" height="44" role="img" aria-label="SymphonyAI">
+    <g fill="none" stroke-linecap="round" stroke-width="9">
+        <path d="M9,50 L30,10" stroke="#7B2FF7" />
+        <path d="M23,50 L44,10" stroke="#2F6FED" />
+        <path d="M37,50 L58,10" stroke="#F5A623" />
+        <circle cx="9" cy="50" r="4.5" fill="#7B2FF7" />
+        <circle cx="30" cy="10" r="4.5" fill="#7B2FF7" />
+        <circle cx="23" cy="50" r="4.5" fill="#2F6FED" />
+        <circle cx="44" cy="10" r="4.5" fill="#2F6FED" />
+        <circle cx="37" cy="50" r="4.5" fill="#F5A623" />
+        <circle cx="58" cy="10" r="4.5" fill="#F5A623" />
+    </g>
+    <text x="74" y="42" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#2B0A4D">SymphonyAI</text>
+</svg>

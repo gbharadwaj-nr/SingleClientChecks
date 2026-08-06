@@ -20,12 +20,22 @@ def render_report(client_name: str, client_logo: str, account_id: str,
     )
     template = env.get_template("report_template.html")
 
+    summary = {"total": 0, "passed": 0, "warning": 0, "failed": 0}
+    for section in sections:
+        for row in section["rows"]:
+            summary["total"] += 1
+            status = row.get("status", "ok")
+            summary["passed" if status == "ok" else "warning" if status == "warning" else "failed"] += 1
+    overall_status = "UNHEALTHY" if summary["failed"] else "HEALTHY"
+
     html = template.render(
         client_name=client_name,
         client_logo=client_logo,
         account_id=account_id,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         sections=sections,
+        summary=summary,
+        overall_status=overall_status,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

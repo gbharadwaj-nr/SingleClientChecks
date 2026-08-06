@@ -3,7 +3,7 @@
 from bootstrap import CLIENTS, ROLE_NAME  # noqa: E402
 
 CLIENT_NAME = "FleetCor"
-CLIENT_LOGO = "symphonyai-logo.png"
+CLIENT_LOGO = "symphonyai-logo.svg"
 
 # Real account ID and IAM role, sourced from DailyChecksFramework/config.py.
 AWS_ACCOUNT_ID = CLIENTS["FleetCor"]["account_id"]
