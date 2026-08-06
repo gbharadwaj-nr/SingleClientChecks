@@ -95,6 +95,16 @@ def get_account_id(session: boto3.Session) -> str:
     return session.client("sts").get_caller_identity()["Account"]
 
 
+def list_all_regions(session: boto3.Session) -> list[str]:
+    """Return every region enabled for this account, regardless of EC2 activity.
+
+    Used when a resource (e.g. a CloudWatch Logs log group) could exist in a region
+    with no EC2 instances, so the EC2-activity-filtered `discover_regions` won't do.
+    """
+    ec2 = session.client("ec2", region_name="us-east-1")
+    return sorted(r["RegionName"] for r in ec2.describe_regions()["Regions"])
+
+
 def bootstrap(account_id: str, role_name: str = ROLE_NAME, profile: Optional[str] = None) -> AWSContext:
     """Entry point used by client runners: assumes the client's role and discovers active regions."""
     base_session = get_base_session(profile=profile or os.environ.get("AWS_PROFILE"))

@@ -8,7 +8,7 @@ CLIENT_LOGO = "symphonyai-logo.png"
 # Real account ID and IAM role, sourced from DailyChecksFramework/config.py.
 AWS_ACCOUNT_ID = CLIENTS["FleetCor"]["account_id"]
 AWS_ROLE_NAME = ROLE_NAME
-AWS_REGION = "us-east-1"
+# No fixed region: main.py searches all enabled regions to find each log group.
 
 OUTPUT_DIR = "output"
 REPORT_FILENAME = "report.html"

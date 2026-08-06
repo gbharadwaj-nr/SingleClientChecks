@@ -16,9 +16,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 import config
-from bootstrap import bootstrap
+from bootstrap import bootstrap, list_all_regions
 from lib.html_report import render_report
-from lib.logs_insights import extract_messages, extract_stats, run_query
+from lib.logs_insights import extract_messages, extract_stats, find_log_group_region, run_query
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +42,28 @@ def _evaluate_stats_check(check: dict, results: list[list[dict]]) -> tuple[str, 
     return (check["success_label"], True) if passed else (check["failure_label"], False)
 
 
-def evaluate_check(check: dict, logs_client) -> tuple[str, bool | None]:
+def _get_logs_client(session, log_group: str, all_regions: list[str], region_cache: dict) -> tuple[object | None, str | None]:
+    """Return a (logs_client, region) for this log group, discovering and caching its region."""
+    if log_group not in region_cache:
+        region_cache[log_group] = find_log_group_region(session, log_group, all_regions)
+
+    region = region_cache[log_group]
+    if region is None:
+        return None, None
+    return session.client("logs", region_name=region), region
+
+
+def evaluate_check(check: dict, session, all_regions: list[str], region_cache: dict) -> tuple[str, bool | None]:
     """Run one check's Logs Insights query and return (status_label, passed).
 
     `passed` is None for checks that have no query configured yet.
     """
     if not check["query"] or not check["log_group"]:
         return "Not Configured", None
+
+    logs_client, _region = _get_logs_client(session, check["log_group"], all_regions, region_cache)
+    if logs_client is None:
+        return check["failure_label"], False
 
     lookback_minutes = check.get("lookback_minutes", config.QUERY_LOOKBACK_MINUTES)
     results = run_query(logs_client, check["log_group"], check["query"], lookback_minutes)
@@ -68,12 +83,13 @@ def evaluate_check(check: dict, logs_client) -> tuple[str, bool | None]:
     return check["success_label"], True
 
 
-def run_checks(logs_client) -> list[dict]:
+def run_checks(session, all_regions: list[str]) -> list[dict]:
     """Run every configured check and return results in their declared order."""
     results = []
+    region_cache: dict[str, str | None] = {}
     for check in config.CHECKS:
         try:
-            status_label, passed = evaluate_check(check, logs_client)
+            status_label, passed = evaluate_check(check, session, all_regions, region_cache)
         except Exception:
             logger.exception("Check %s raised an unexpected error", check["name"])
             status_label, passed = check["failure_label"], False
@@ -120,12 +136,12 @@ def build_sections(results: list[dict]) -> list[dict]:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(level=logging.INFO)
 
     aws_ctx = bootstrap(account_id=config.AWS_ACCOUNT_ID, role_name=config.AWS_ROLE_NAME)
-    logs_client = aws_ctx.session.client("logs", region_name=config.AWS_REGION)
+    all_regions = list_all_regions(aws_ctx.session)
 
-    results = run_checks(logs_client)
+    results = run_checks(aws_ctx.session, all_regions)
     print_report(results)
 
     output_path = Path(__file__).resolve().parent / config.OUTPUT_DIR / config.REPORT_FILENAME

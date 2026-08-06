@@ -45,13 +45,37 @@ def run_query(logs_client, log_group: str, query_string: str, lookback_minutes: 
             if status != "Complete":
                 logger.warning("Logs Insights query for %s ended with status %s", log_group, status)
                 return []
-            return response.get("results", [])
+            rows = response.get("results", [])
+            logger.info("Logs Insights query for %s returned %d row(s)", log_group, len(rows))
+            return rows
 
         time.sleep(_POLL_INTERVAL_SECONDS)
         elapsed_seconds += _POLL_INTERVAL_SECONDS
 
     logger.warning("Logs Insights query for %s did not complete within %ss", log_group, _MAX_WAIT_SECONDS)
     return []
+
+
+def find_log_group_region(session, log_group_name: str, regions: list[str]) -> str | None:
+    """Search every region for a log group with this exact name and return the region it's in.
+
+    Log groups are region-scoped and different client accounts may keep them in
+    different regions, so this avoids hardcoding a region per client.
+    """
+    for region in regions:
+        logs_client = session.client("logs", region_name=region)
+        try:
+            response = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name, limit=1)
+        except Exception:
+            logger.exception("Failed to describe log groups in %s", region)
+            continue
+
+        if any(group["logGroupName"] == log_group_name for group in response.get("logGroups", [])):
+            logger.info("Found log group %s in region %s", log_group_name, region)
+            return region
+
+    logger.warning("Log group %s not found in any of %d regions", log_group_name, len(regions))
+    return None
 
 
 def extract_messages(results: list[list[dict]]) -> list[str]:
