@@ -113,7 +113,7 @@ CHECKS = [
             "| limit 10"
         ),
         "lookback_minutes": 10080,  # matches START=-604800s (7 days) in the original console query
-        "detail_regex": r"^(\d{8})",  # leading batch date, e.g. 20260805
+        "detail_regex": r"(\d{8})\s*\|",  # batch date before the first '|' field separator
         "detail_target": "name",  # shown as "Batch Files (20260805)"
         "success_label": "Completed",
         "failure_label": "Failed",
@@ -145,6 +145,8 @@ CHECKS = [
             "| sort @timestamp desc\n"
             "| limit 6"
         ),
+        "detail_regex": r"(?i)(acq_success_\S+)",  # flag file name, e.g. acq_success_20260805.flag
+        "detail_target": "status",  # shown as "Sent (acq_success_20260805.flag)"
         "success_label": "Sent",
         "failure_label": "Not Sent",
     },

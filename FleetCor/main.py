@@ -44,13 +44,21 @@ def _evaluate_stats_check(check: dict, results: list[list[dict]]) -> tuple[str, 
 
 
 def _extract_detail(check: dict, messages: list[str]) -> str | None:
-    """Pull an inline detail (e.g. a batch date or filename) out of the most recent message."""
+    """Pull an inline detail (e.g. a batch date or filename) out of the messages.
+
+    Messages are already sorted most-recent-first, so this returns the detail from the
+    first (i.e. latest) message that actually matches - not just the very first message,
+    since a shared log stream can interleave unrelated lines.
+    """
     pattern = check.get("detail_regex")
-    if not pattern or not messages:
+    if not pattern:
         return None
 
-    match = re.search(pattern, messages[0])
-    return match.group(1) if match else None
+    for message in messages:
+        match = re.search(pattern, message)
+        if match:
+            return match.group(1)
+    return None
 
 
 def _get_logs_client(session, log_group: str, all_regions: list[str], region_cache: dict) -> tuple[object | None, str | None]:
