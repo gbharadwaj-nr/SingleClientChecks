@@ -12,6 +12,7 @@ are required as long as the check follows the same {log_group, query, labels} sh
 import logging
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -20,6 +21,7 @@ import config
 from bootstrap import bootstrap, list_all_regions
 from lib.html_report import render_report
 from lib.logs_insights import extract_messages, extract_stats, find_log_group_region, run_query
+from lib.teams_notification import send_teams_notification
 
 logger = logging.getLogger(__name__)
 
@@ -131,10 +133,14 @@ def format_row(result: dict) -> tuple[str, str]:
     return name, status
 
 
+def compute_overall_status(results: list[dict]) -> str:
+    """Return 'UNHEALTHY' if any check explicitly failed, else 'HEALTHY'."""
+    return "UNHEALTHY" if any(result["passed"] is False for result in results) else "HEALTHY"
+
+
 def print_report(results: list[dict]) -> None:
     """Print results grouped by category, matching the required report layout."""
     categories = list(dict.fromkeys(result["category"] for result in results))
-    overall_healthy = True
 
     for category in categories:
         print(category)
@@ -145,12 +151,10 @@ def print_report(results: list[dict]) -> None:
                 continue
             name, status = format_row(result)
             print(f"{name:<28}{status}")
-            if result["passed"] is False:
-                overall_healthy = False
 
         print()
 
-    print(f"Overall Status : {'HEALTHY' if overall_healthy else 'UNHEALTHY'}")
+    print(f"Overall Status : {compute_overall_status(results)}")
 
 
 # Row status accepted by report_template.html / styles.css.
@@ -180,15 +184,26 @@ def main() -> None:
     results = run_checks(aws_ctx.session, all_regions)
     print_report(results)
 
+    sections = build_sections(results)
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
     output_path = Path(__file__).resolve().parent / config.OUTPUT_DIR / config.REPORT_FILENAME
     render_report(
         client_name=config.CLIENT_NAME,
         client_logo=config.CLIENT_LOGO,
         account_id=aws_ctx.account_id,
-        sections=build_sections(results),
+        sections=sections,
         output_path=output_path,
     )
     logger.info("Report written to %s", output_path)
+
+    send_teams_notification(
+        client_name=config.CLIENT_NAME,
+        account_id=aws_ctx.account_id,
+        generated_at=generated_at,
+        overall_status=compute_overall_status(results),
+        sections=sections,
+    )
 
 
 if __name__ == "__main__":

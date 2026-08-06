@@ -53,9 +53,11 @@ pipeline {
         stage('Run health checks') {
             steps {
                 // Injects AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN for the
-                // master account; bootstrap.py then assumes the client role from there.
+                // master account (bootstrap.py assumes the client role from there), plus
+                // TEAMS_WEBHOOK so main.py can post the executive summary to Teams.
                 withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-master-account']
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-master-account'],
+                    string(credentialsId: 'teams-webhook', variable: 'TEAMS_WEBHOOK')
                 ]) {
                     dir('FleetCor') {
                         bat 'python -u main.py'
