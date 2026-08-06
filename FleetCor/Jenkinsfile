@@ -7,10 +7,13 @@ pipeline {
 
     options {
         timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '30'))
     }
 
     environment {
-        AWS_PROFILE = 'fleetcor'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        PYTHONUNBUFFERED = '1'
     }
 
     stages {
@@ -28,10 +31,35 @@ pipeline {
             }
         }
 
+        stage('Verify AWS Credentials') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-master-account']
+                ]) {
+                    bat '''
+                    @echo off
+                    aws sts get-caller-identity >nul 2>&1
+                    if %ERRORLEVEL%==0 (
+                        echo AWS Credentials Verified Successfully
+                    ) else (
+                        echo ERROR : AWS Credentials Verification Failed
+                        exit /b 1
+                    )
+                    '''
+                }
+            }
+        }
+
         stage('Run health checks') {
             steps {
-                dir('FleetCor') {
-                    bat 'python main.py'
+                // Injects AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN for the
+                // master account; bootstrap.py then assumes the client role from there.
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-master-account']
+                ]) {
+                    dir('FleetCor') {
+                        bat 'python -u main.py'
+                    }
                 }
             }
         }
