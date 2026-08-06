@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ client_name }} - AWS Daily Health Check</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="report-header">
+        <img src="logos/{{ client_logo }}" alt="{{ client_name }} logo" class="logo">
+        <div>
+            <h1>{{ client_name }} - AWS Daily Health Check</h1>
+            <p class="report-meta">Generated: {{ generated_at }} | Account: {{ account_id }}</p>
+        </div>
+    </header>
+
+    <main>
+        {% for section in sections %}
+        <section class="report-section">
+            <h2>{{ section.title }}</h2>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        {% for column in section.columns %}
+                        <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in section.rows %}
+                    <tr class="status-{{ row.status | default('ok') }}">
+                        {% for cell in row.cells %}
+                        <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endfor %}
+    </main>
+
+    <footer class="report-footer">
+        <p>Generated automatically by AWS Daily Health Checks</p>
+    </footer>
+</body>
+</html>

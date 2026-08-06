@@ -1,0 +1,69 @@
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f6f8;
+    color: #1f2933;
+}
+
+.report-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background-color: #0b2545;
+    color: #ffffff;
+    padding: 16px 24px;
+}
+
+.report-header .logo {
+    height: 48px;
+}
+
+.report-meta {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: #d3d9e0;
+}
+
+main {
+    padding: 24px;
+}
+
+.report-section {
+    margin-bottom: 32px;
+    background: #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 16px;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e1e4e8;
+}
+
+.status-ok {
+    background-color: #eafaf1;
+}
+
+.status-warning {
+    background-color: #fff8e1;
+}
+
+.status-error {
+    background-color: #fdecea;
+}
+
+.report-footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}

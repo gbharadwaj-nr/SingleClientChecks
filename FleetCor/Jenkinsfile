@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    triggers {
+        cron('H 6 * * *')
+    }
+
+    options {
+        timestamps()
+    }
+
+    environment {
+        AWS_PROFILE = 'fleetcor'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
+                sh 'pip install -r ../requirements.txt'
+            }
+        }
+
+        stage('Run health checks') {
+            steps {
+                sh 'python main.py'
+            }
+        }
+
+        stage('Publish report') {
+            steps {
+                archiveArtifacts artifacts: 'output/*.html', fingerprint: true
+                publishHTML(target: [
+                    reportDir: 'output',
+                    reportFiles: 'report.html',
+                    reportName: 'FleetCor AWS Health Check'
+                ])
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
