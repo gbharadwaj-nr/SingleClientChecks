@@ -72,34 +72,66 @@ CHECKS = [
         "failure_label": "Unavailable",
     },
     {
+        # Maps to the "DXV - Acquisition Success Files" dashboard widget.
         "name": "DXV",
         "category": "System Checks",
-        "log_group": None,  # TODO: log group + query to be provided
-        "query": None,
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /check_acq_success.log/\n"
+            "| sort @timestamp desc\n"
+            "| limit 6"
+        ),
+        "lookback_minutes": 10080,  # matches START=-604800s (7 days) in the original console query
         "success_label": "Available",
         "failure_label": "Unavailable",
     },
     {
+        # Maps to the "AML Batch Monitoring" dashboard widget.
         "name": "AML Batch",
         "category": "System Checks",
-        "log_group": None,  # TODO: log group + query to be provided
-        "query": None,
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /aml_batch_monitoring.log/\n"
+            "| sort @timestamp desc\n"
+            "| limit 5"
+        ),
+        "lookback_minutes": 180,  # matches START=-10800s (3 hours) in the original console query
         "success_label": "Completed",
         "failure_label": "Failed",
     },
     {
+        # Maps to the "WLM Batch Monitoring" dashboard widget.
         "name": "Batch Files",
         "category": "Batch Process",
-        "log_group": None,  # TODO: log group + query to be provided
-        "query": None,
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /wlm_batch_monitoring.log/\n"
+            "| sort @timestamp desc\n"
+            "| limit 10"
+        ),
+        "lookback_minutes": 10080,  # matches START=-604800s (7 days) in the original console query
+        "detail_regex": r"^(\d{8})",  # leading batch date, e.g. 20260805
+        "detail_target": "name",  # shown as "Batch Files (20260805)"
         "success_label": "Completed",
         "failure_label": "Failed",
     },
     {
+        # Maps to the "DXV - BAD Files" dashboard widget.
         "name": "Bad Records",
         "category": "Feedback Files",
-        "log_group": None,  # TODO: log group + query to be provided
-        "query": None,
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /check_bad_files.log/\n"
+            "| sort @timestamp desc\n"
+            "| limit 20"
+        ),
+        "lookback_minutes": 10080,  # matches START=-604800s (7 days) in the original console query
+        "detail_regex": r"(NetReveal_BAD_\d+\.ZIP)",  # bad-file name, e.g. NetReveal_BAD_20260805.ZIP
+        "detail_target": "status",  # shown as "Sent (NetReveal_BAD_20260805.ZIP)"
         "success_label": "Sent",
         "failure_label": "Not Sent",
     },

@@ -10,6 +10,7 @@ are required as long as the check follows the same {log_group, query, labels} sh
 """
 
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -42,6 +43,16 @@ def _evaluate_stats_check(check: dict, results: list[list[dict]]) -> tuple[str, 
     return (check["success_label"], True) if passed else (check["failure_label"], False)
 
 
+def _extract_detail(check: dict, messages: list[str]) -> str | None:
+    """Pull an inline detail (e.g. a batch date or filename) out of the most recent message."""
+    pattern = check.get("detail_regex")
+    if not pattern or not messages:
+        return None
+
+    match = re.search(pattern, messages[0])
+    return match.group(1) if match else None
+
+
 def _get_logs_client(session, log_group: str, all_regions: list[str], region_cache: dict) -> tuple[object | None, str | None]:
     """Return a (logs_client, region) for this log group, discovering and caching its region."""
     if log_group not in region_cache:
@@ -53,34 +64,36 @@ def _get_logs_client(session, log_group: str, all_regions: list[str], region_cac
     return session.client("logs", region_name=region), region
 
 
-def evaluate_check(check: dict, session, all_regions: list[str], region_cache: dict) -> tuple[str, bool | None]:
-    """Run one check's Logs Insights query and return (status_label, passed).
+def evaluate_check(check: dict, session, all_regions: list[str], region_cache: dict) -> tuple[str, bool | None, str | None]:
+    """Run one check's Logs Insights query and return (status_label, passed, detail).
 
-    `passed` is None for checks that have no query configured yet.
+    `passed` is None for checks that have no query configured yet. `detail` is an optional
+    extra bit of context (e.g. a batch date or filename) pulled from the latest message.
     """
     if not check["query"] or not check["log_group"]:
-        return "Not Configured", None
+        return "Not Configured", None, None
 
     logs_client, _region = _get_logs_client(session, check["log_group"], all_regions, region_cache)
     if logs_client is None:
-        return check["failure_label"], False
+        return check["failure_label"], False, None
 
     lookback_minutes = check.get("lookback_minutes", config.QUERY_LOOKBACK_MINUTES)
     results = run_query(logs_client, check["log_group"], check["query"], lookback_minutes)
 
     if check.get("result_type") == "stats":
-        return _evaluate_stats_check(check, results)
+        status_label, passed = _evaluate_stats_check(check, results)
+        return status_label, passed, None
 
     messages = extract_messages(results)
 
     if not messages:
-        return check["failure_label"], False
+        return check["failure_label"], False, None
 
     has_failure = any(keyword in message.lower() for message in messages for keyword in _FAILURE_KEYWORDS)
     if has_failure:
-        return check["failure_label"], False
+        return check["failure_label"], False, None
 
-    return check["success_label"], True
+    return check["success_label"], True, _extract_detail(check, messages)
 
 
 def run_checks(session, all_regions: list[str]) -> list[dict]:
@@ -89,12 +102,25 @@ def run_checks(session, all_regions: list[str]) -> list[dict]:
     region_cache: dict[str, str | None] = {}
     for check in config.CHECKS:
         try:
-            status_label, passed = evaluate_check(check, session, all_regions, region_cache)
+            status_label, passed, detail = evaluate_check(check, session, all_regions, region_cache)
         except Exception:
             logger.exception("Check %s raised an unexpected error", check["name"])
-            status_label, passed = check["failure_label"], False
-        results.append({**check, "status_label": status_label, "passed": passed})
+            status_label, passed, detail = check["failure_label"], False, None
+        results.append({**check, "status_label": status_label, "passed": passed, "detail": detail})
     return results
+
+
+def format_row(result: dict) -> tuple[str, str]:
+    """Apply a check's optional inline detail to its name or status, per detail_target."""
+    name = result["name"]
+    status = result["status_label"]
+    detail = result.get("detail")
+    if detail:
+        if result.get("detail_target") == "name":
+            name = f"{name} ({detail})"
+        else:
+            status = f"{status} ({detail})"
+    return name, status
 
 
 def print_report(results: list[dict]) -> None:
@@ -109,7 +135,8 @@ def print_report(results: list[dict]) -> None:
         for result in results:
             if result["category"] != category:
                 continue
-            print(f"{result['name']:<20}{result['status_label']}")
+            name, status = format_row(result)
+            print(f"{name:<28}{status}")
             if result["passed"] is False:
                 overall_healthy = False
 
@@ -126,12 +153,13 @@ def build_sections(results: list[dict]) -> list[dict]:
     """Convert check results into the {title, columns, rows} shape used by the HTML report."""
     sections = []
     for category in dict.fromkeys(result["category"] for result in results):
-        rows = [
-            {"status": _ROW_STATUS[result["passed"]], "cells": [result["name"], result["status_label"]]}
-            for result in results
-            if result["category"] == category
-        ]
-        sections.append({"title": category, "columns": ["Check", "Result"], "rows": rows})
+        rows = []
+        for result in results:
+            if result["category"] != category:
+                continue
+            name, status = format_row(result)
+            rows.append({"status": _ROW_STATUS[result["passed"]], "cells": [name, status]})
+        sections.append({"title": category, "columns": [category, "Status"], "rows": rows})
     return sections
 
 
