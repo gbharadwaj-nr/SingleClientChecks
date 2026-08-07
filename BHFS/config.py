@@ -13,9 +13,11 @@ OUTPUT_DIR = "output"
 REPORT_FILENAME = "report.html"
 
 # CloudWatch Logs log groups used by the health checks.
-# TODO: confirm the exact "application" log group name in the BHFS account - this is a placeholder.
+# Confirmed against real BHFS infra via `aws logs start-query` (2026-08-07).
 LOG_GROUPS = {
     "application": "bhfs-production-ApplicationLogs-uu5ZxF4Mn8aS",
+    "system": "bhfs-production-SystemLogs-gNRVgqfVOlob",
+    "cloudformation": "bhfs-production-CloudFormationLogs-lgFRrcY9B9wE",
     "ui": "/aws/lambda/bhfsproductionUIAvailabilityCheck",
 }
 
@@ -24,7 +26,6 @@ LOG_STREAM_FILTER = "(@logStream like /norkom.log/ or @logStream like /applicati
 
 # Specific log streams used by the per-stream checks in lib/checks.py.
 LOG_STREAMS = {
-    "norkom": "norkom.log",
     "application": "application.log",
     "aml_batch": "aml_batch_monitoring.log",
     "wlm_batch": "wlm_batch_monitoring.log",
@@ -46,13 +47,14 @@ UI_AVAILABILITY_WARNING_PCT = 95.0
 
 # Each entry wires a check's independent function (lib/checks.py) into the report.
 # category groups rows into report sections; log_group is a key into LOG_GROUPS (defaults to
-# "application" in main.py if omitted); func(logs_client, log_group, lookback_minutes) must
-# return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
+# "application" in main.py if omitted); log_groups (list of LOG_GROUPS keys) instead runs the
+# check across several log groups at once via run_query_multi(). func(logs_client, log_group(s),
+# lookback_minutes) must return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
 CHECKS = [
     {"name": "EC2 Instance Health", "category": "System Checks", "func": "check_ec2_status", "log_group": "application"},
     {"name": "RDS Database Health", "category": "System Checks", "func": "check_rds_status", "log_group": "application"},
     {"name": "UI Availability", "category": "System Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
-    {"name": "Factiva Import", "category": "Batch & File Processing", "func": "check_factiva_import"},
+    {"name": "Factiva Import", "category": "Batch & File Processing", "func": "check_factiva_import", "log_groups": ["application", "system", "cloudformation"]},
     {"name": "Envelope Processing", "category": "Batch & File Processing", "func": "check_envelope_processing"},
     {"name": "AML Batch", "category": "Batch & File Processing", "func": "check_aml_batch"},
     {"name": "WLM Batch", "category": "Batch & File Processing", "func": "check_wlm_batch"},

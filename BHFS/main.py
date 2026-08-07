@@ -2,12 +2,13 @@
 BHFS AWS Daily Health Check.
 
 Runs a set of independent CloudWatch Logs Insights checks - one per log stream
-(check_ec2_status.log, check_rds_status.log, norkom.log, application.log,
-aml/wlm/cdd_batch_monitoring.log, check_acq_success.log, check_bad_files.log,
-api_rest_response) plus the UI Availability check (separate Lambda log group) and a
-couple of message-pattern checks (Envelope Processing, Transaction File, Real-Time
-Processing) - prints a console health report, and renders the same standard client
-HTML report used by the other client folders.
+(check_ec2_status.log, check_rds_status.log, application.log,
+aml/wlm/cdd_batch_monitoring.log, check_acq_success.log, check_bad_files.log) plus the
+UI Availability check (separate Lambda log group), a multi-log-group Factiva Import
+check (ApplicationLogs + SystemLogs + CloudFormationLogs), and a couple of
+message-pattern checks (Envelope Processing, Transaction File, Real-Time Processing,
+Real-Time API Latency) - prints a console health report, and renders the same standard
+client HTML report used by the other client folders.
 
 Each check is an independent function in lib/checks.py returning a Healthy/Warning/
 Failed status plus a detail string. Add new checks by adding a function there and an
@@ -51,15 +52,21 @@ def run_checks(session, all_regions: list[str]) -> list[dict]:
     results = []
     for check in config.CHECKS:
         func = CHECK_FUNCTIONS[check["func"]]
-        log_group = config.LOG_GROUPS[check.get("log_group", "application")]
         lookback_minutes = check.get("lookback_minutes", config.QUERY_LOOKBACK_MINUTES)
-        logs_client = _get_logs_client(session, log_group, all_regions, region_cache)
+
+        if "log_groups" in check:
+            # Multi-log-group check (e.g. Factiva Import): all groups must share one region.
+            target = [config.LOG_GROUPS[key] for key in check["log_groups"]]
+            logs_client = _get_logs_client(session, target[0], all_regions, region_cache)
+        else:
+            target = config.LOG_GROUPS[check.get("log_group", "application")]
+            logs_client = _get_logs_client(session, target, all_regions, region_cache)
 
         if logs_client is None:
-            status, detail = "Failed", f"Log group {log_group} not found in any region"
+            status, detail = "Failed", f"Log group(s) {target} not found in any region"
         else:
             try:
-                outcome = func(logs_client, log_group, lookback_minutes)
+                outcome = func(logs_client, target, lookback_minutes)
                 status, detail = outcome["status"], outcome["detail"]
             except Exception:
                 logger.exception("Check %s raised an unexpected error", check["name"])

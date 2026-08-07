@@ -11,7 +11,7 @@ but each check's log stream, search terms and pass/fail logic are independent of
 import re
 
 import config
-from lib.logs_insights import extract_fields, extract_messages, extract_stats, run_query
+from lib.logs_insights import extract_fields, extract_messages, extract_stats, run_query, run_query_multi
 
 HEALTHY = "Healthy"
 WARNING = "Warning"
@@ -129,7 +129,8 @@ def check_api_latency(logs_client, log_group: str, lookback_minutes: int) -> dic
     results = run_query(logs_client, log_group, query, lookback_minutes)
     rows = extract_fields(results)
     if not rows:
-        return {"status": FAILED, "detail": "No latency/response-time activity found in application logs"}
+        # No matching lines just means no observed API traffic in this window, not a confirmed outage.
+        return {"status": WARNING, "detail": "No latency/response-time activity found in application logs"}
 
     latencies = []
     for row in rows:
@@ -183,20 +184,27 @@ def check_ui_availability(logs_client, log_group: str, lookback_minutes: int) ->
     return {"status": FAILED, "detail": detail}
 
 
-def check_factiva_import(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """norkom.log: confirm the Factiva FPFA list import finished; extract filename and timestamp."""
-    rows = _run_stream(
-        logs_client, log_group, config.LOG_STREAMS["norkom"], lookback_minutes,
-        limit=5, message_filter="@message like /End of Factiva FPFA list import/",
+def check_factiva_import(logs_client, log_groups: list[str], lookback_minutes: int) -> dict:
+    """ApplicationLogs/SystemLogs/CloudFormationLogs: confirm the Factiva FPFA list import
+    finished; extract filename and timestamp. Searched across all three log groups at once
+    since the completion line isn't guaranteed to land in ApplicationLogs alone."""
+    query = (
+        "fields @timestamp, @logStream, @message\n"
+        "| filter @message like /End of Factiva FPFA list import/\n"
+        "| sort @timestamp desc\n"
+        "| limit 50"
     )
+    results = run_query_multi(logs_client, log_groups, query, lookback_minutes)
+    rows = extract_fields(results)
     if not rows:
-        return {"status": FAILED, "detail": "No 'End of Factiva FPFA list import' entry found in norkom.log"}
+        return {"status": FAILED, "detail": "No 'End of Factiva FPFA list import' entry found across ApplicationLogs/SystemLogs/CloudFormationLogs"}
 
     message = rows[0].get("@message", "")
     timestamp = rows[0].get("@timestamp", "")
+    log_stream = rows[0].get("@logStream", "")
     filename_match = re.search(r"([\w\-]+\.(?:txt|csv|zip|dat))", message, re.IGNORECASE)
     filename = filename_match.group(1) if filename_match else "unknown file"
-    return {"status": HEALTHY, "detail": f"{filename} imported at {timestamp}"}
+    return {"status": HEALTHY, "detail": f"{filename} imported at {timestamp} ({log_stream})"}
 
 
 def check_envelope_processing(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -300,11 +308,16 @@ def check_bad_files(logs_client, log_group: str, lookback_minutes: int) -> dict:
 
 
 def check_application_log(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """application.log: search for application errors, exceptions, API errors and failed notifications."""
+    """application.log: search for application errors, exceptions, API errors and failed notifications.
+
+    Excludes lines the app itself flags as informational (e.g. "status log-statement ONLY
+    and can be safely ignored") - some jobs log routine tracing at ERROR level by design.
+    """
     message_filter = (
-        "@message like /ERROR/ or @message like /Exception/ or @message like /FATAL/ "
+        "(@message like /ERROR/ or @message like /Exception/ or @message like /FATAL/ "
         "or @message like /HTTP 500/ or @message like /Internal Server Error/ or @message like /API Error/ "
-        "or @message like /Failed outbound/ or @message like /Notification failed/ or @message like /SMTP Error/"
+        "or @message like /Failed outbound/ or @message like /Notification failed/ or @message like /SMTP Error/) "
+        "and @message not like /safely ignored/ and @message not like /status log-statement ONLY/"
     )
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["application"], lookback_minutes,
