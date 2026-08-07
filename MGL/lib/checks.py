@@ -30,7 +30,9 @@ def _run_stream(logs_client, log_group: str, stream: str, lookback_minutes: int,
     Returns rows (most-recent-first) as {"@message": ..., "@timestamp": ...} dicts so
     callers can pull both the message text and its timestamp for the latest entry.
     """
-    filter_clause = f"@logStream like /{stream}/"
+    # Use a quoted substring match, not /regex/ - MGL's stream names contain literal "/"
+    # (e.g. "batch/i-.../batch/norkom.log"), which breaks the /regex/ delimiter syntax.
+    filter_clause = f'@logStream like "{stream}"'
     if message_filter:
         filter_clause += f" and ({message_filter})"
     query = (
