@@ -66,6 +66,32 @@ def check_ui_availability(logs_client, log_group: str, lookback_minutes: int) ->
     return {"status": HEALTHY if pct >= 100.0 else FAILED, "detail": detail}
 
 
+def check_rds_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
+    """check_rds_status.log: verify RDS database health."""
+    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["rds_status"], lookback_minutes, limit=2)
+    if not rows:
+        return {"status": FAILED, "detail": "No RDS status entries found in check_rds_status.log"}
+
+    messages = [row.get("@message", "") for row in rows]
+    failing = [m for m in messages if any(keyword in m.lower() for keyword in _FAILURE_KEYWORDS)]
+    if failing:
+        return {"status": FAILED, "detail": f"{len(failing)} RDS issue(s) - latest: {failing[0][:200]}"}
+    return {"status": HEALTHY, "detail": messages[0][:200]}
+
+
+def check_ec2_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
+    """check_ec2_status.log: verify EC2 instance health."""
+    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["ec2_status"], lookback_minutes, limit=3)
+    if not rows:
+        return {"status": FAILED, "detail": "No EC2 status entries found in check_ec2_status.log"}
+
+    messages = [row.get("@message", "") for row in rows]
+    failing = [m for m in messages if any(keyword in m.lower() for keyword in _FAILURE_KEYWORDS)]
+    if failing:
+        return {"status": FAILED, "detail": f"{len(failing)} EC2 instance issue(s) - latest: {failing[0][:200]}"}
+    return {"status": HEALTHY, "detail": messages[0][:200]}
+
+
 def check_worldcheck_download(logs_client, log_group: str, lookback_minutes: int) -> dict:
     """runBatch.log: verify the daily WorldCheck download completed; extract status and timestamp."""
     rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes, limit=20)
@@ -144,33 +170,30 @@ def check_acquisition_status(logs_client, log_group: str, lookback_minutes: int)
 
 
 def check_wlm_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """getDXVLandingFiles.log + norkom.log: confirm WLM starts after Acquisition and its index rebuild completes."""
-    landing_rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["get_dxv_landing_files"], lookback_minutes, limit=100)
-    acquisition_matches = [row for row in landing_rows if "acquisition" in row.get("@message", "").lower()]
-    wlm_matches = [row for row in landing_rows if "wlm" in row.get("@message", "").lower()]
+    """runBatch.log: verify the WLM batch completed successfully; cross-check against
+    the index rebuild completion in norkom.log (requirement: WLM runs only after it)."""
+    rows = _run_stream(
+        logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
+        limit=20, message_filter="@message like /WLM Batch/",
+    )
+    if not rows:
+        return {"status": FAILED, "detail": "No 'WLM Batch' entries found in runBatch.log"}
 
-    if not wlm_matches:
-        return {"status": FAILED, "detail": "No WLM batch activity found in getDXVLandingFiles.log"}
-
-    # Rows are sorted @timestamp desc, so the last match in the list is chronologically the earliest.
-    wlm_start_ts = wlm_matches[-1].get("@timestamp", "")
-    order_ok = True
-    if acquisition_matches:
-        acquisition_start_ts = acquisition_matches[-1].get("@timestamp", "")
-        order_ok = acquisition_start_ts <= wlm_start_ts
-
-    if not order_ok:
-        return {"status": FAILED, "detail": f"WLM started at {wlm_start_ts} before Acquisition"}
+    message, timestamp = rows[0].get("@message", ""), rows[0].get("@timestamp", "")
+    if any(keyword in message.lower() for keyword in _FAILURE_KEYWORDS):
+        return {"status": FAILED, "detail": f"{message[:200]} at {timestamp}"}
+    if "success" not in message.lower():
+        return {"status": WARNING, "detail": f"Ambiguous WLM batch status - {message[:200]} at {timestamp}"}
 
     index_rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["norkom"], lookback_minutes,
         limit=10, message_filter="@message like /Finished executing procedure IndexReportProcedure/",
     )
     if not index_rows:
-        return {"status": WARNING, "detail": f"WLM started at {wlm_start_ts} (after Acquisition) but IndexReportProcedure completion not found in norkom.log"}
+        return {"status": WARNING, "detail": f"{message[:150]} at {timestamp}, but IndexReportProcedure completion not found in norkom.log"}
 
     index_ts = index_rows[0].get("@timestamp", "")
-    return {"status": HEALTHY, "detail": f"WLM started at {wlm_start_ts} after Acquisition; IndexReportProcedure finished at {index_ts}"}
+    return {"status": HEALTHY, "detail": f"{message[:150]} at {timestamp}; IndexReportProcedure finished at {index_ts}"}
 
 
 def check_rds_maintenance(session, all_regions: list[str], lookback_minutes: int) -> dict:
@@ -201,6 +224,8 @@ def check_database_validation(lookback_minutes: int) -> dict:
 
 CHECK_FUNCTIONS = {
     "check_ui_availability": check_ui_availability,
+    "check_ec2_status": check_ec2_status,
+    "check_rds_status": check_rds_status,
     "check_worldcheck_download": check_worldcheck_download,
     "check_index_rebuild": check_index_rebuild,
     "check_envelope_processing": check_envelope_processing,

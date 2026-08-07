@@ -32,8 +32,12 @@ LOG_STREAMS = {
     "poll_dxv_landing": "dmz-/i-078d2fff05b048af1/pollDXVLanding.log",
     # Batch Status / Acquisition Status / WLM Status (start-order half).
     "get_dxv_landing_files": "batch/i-0a1a72b531032dc24/batch/getDXVLandingFiles.log",
-    # WorldCheck Daily Download.
-    "run_batch": "runBatch.log",
+    # WorldCheck Daily Download / WLM Status (direct "WLM Batch Success" line).
+    "run_batch": "batch/i-0a1a72b531032dc24/batch/runBatch.log",
+    # RDS Status.
+    "rds_status": "check_rds_status.log",
+    # EC2 Instance Health.
+    "ec2_status": "check_ec2_status.log",
 }
 
 # How far back each Logs Insights query should look.
@@ -57,12 +61,16 @@ DB_PASSWORD = os.environ.get("MGL_DB_PASSWORD")
 # All must return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
 CHECKS = [
     {"name": "UI Availability", "category": "System Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
+    {"name": "EC2 Instance Health", "category": "System Checks", "func": "check_ec2_status", "log_group": "application", "lookback_minutes": 180},
+    {"name": "RDS Status", "category": "System Checks", "func": "check_rds_status", "log_group": "application", "lookback_minutes": 180},
     {"name": "RDS Pending Maintenance", "category": "System Checks", "func": "check_rds_maintenance", "kind": "aws_session"},
     {"name": "WorldCheck Download", "category": "Batch & File Processing", "func": "check_worldcheck_download", "log_group": "application"},
     {"name": "Index Rebuild Status", "category": "Batch & File Processing", "func": "check_index_rebuild", "log_group": "application"},
     {"name": "Envelope Processing", "category": "Batch & File Processing", "func": "check_envelope_processing", "log_group": "application"},
     {"name": "Batch Status", "category": "Batch & File Processing", "func": "check_batch_status", "log_group": "application"},
     {"name": "Acquisition Status", "category": "Batch & File Processing", "func": "check_acquisition_status", "log_group": "application"},
-    {"name": "WLM Status", "category": "Batch & File Processing", "func": "check_wlm_status", "log_group": "application"},
-    {"name": "Database Validation", "category": "Database", "func": "check_database_validation", "kind": "standalone"},
+    {"name": "WLM Status", "category": "Batch & File Processing", "func": "check_wlm_status", "log_group": "application", "lookback_minutes": 720},
+    # Database Validation is disabled until real MGL_DB_* connection details are provided -
+    # re-add {"name": "Database Validation", "category": "Database", "func": "check_database_validation",
+    # "kind": "standalone"} once they're configured (lib/db_check.py is still ready to use).
 ]
