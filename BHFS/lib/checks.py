@@ -93,7 +93,7 @@ def _batch_monitoring_status(rows: list[dict[str, str]], stream: str, batch_name
 
 def check_ec2_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
     """check_ec2_status.log: verify EC2 instance health."""
-    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["ec2_status"], lookback_minutes, limit=5)
+    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["ec2_status"], lookback_minutes, limit=3)
     if not rows:
         return {"status": FAILED, "detail": "No EC2 status entries found in check_ec2_status.log"}
 
@@ -106,7 +106,7 @@ def check_ec2_status(logs_client, log_group: str, lookback_minutes: int) -> dict
 
 def check_rds_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
     """check_rds_status.log: verify RDS database health."""
-    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["rds_status"], lookback_minutes, limit=3)
+    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["rds_status"], lookback_minutes, limit=2)
     if not rows:
         return {"status": FAILED, "detail": "No RDS status entries found in check_rds_status.log"}
 
@@ -208,11 +208,11 @@ def check_factiva_import(logs_client, log_groups: list[str], lookback_minutes: i
 
 
 def check_envelope_processing(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """bhfs-production-ApplicationLogs: search for 'Envelope Processing' entries; extract
+    """bhfs-production-ApplicationLogs: search for 'ENVELOPE_' entries; extract
     processing status, timestamp, and envelope filename from the latest event."""
-    rows = _run_rows(logs_client, log_group, "@message like /Envelope Processing/", lookback_minutes, limit=10)
+    rows = _run_rows(logs_client, log_group, "@message like /ENVELOPE_/", lookback_minutes, limit=100)
     if not rows:
-        return {"status": FAILED, "detail": "No 'Envelope Processing' entries found in bhfs-production-ApplicationLogs"}
+        return {"status": FAILED, "detail": "No 'ENVELOPE_' entries found in bhfs-production-ApplicationLogs"}
 
     message = rows[0].get("@message", "")
     timestamp = rows[0].get("@timestamp", "")

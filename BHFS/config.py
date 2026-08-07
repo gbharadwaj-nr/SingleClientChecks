@@ -51,8 +51,8 @@ UI_AVAILABILITY_WARNING_PCT = 95.0
 # check across several log groups at once via run_query_multi(). func(logs_client, log_group(s),
 # lookback_minutes) must return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
 CHECKS = [
-    {"name": "EC2 Instance Health", "category": "System Checks", "func": "check_ec2_status", "log_group": "application"},
-    {"name": "RDS Database Health", "category": "System Checks", "func": "check_rds_status", "log_group": "application"},
+    {"name": "EC2 Instance Health", "category": "System Checks", "func": "check_ec2_status", "log_group": "application", "lookback_minutes": 180},
+    {"name": "RDS Database Health", "category": "System Checks", "func": "check_rds_status", "log_group": "application", "lookback_minutes": 180},
     {"name": "UI Availability", "category": "System Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
     {"name": "Factiva Import", "category": "Batch & File Processing", "func": "check_factiva_import", "log_groups": ["application", "system", "cloudformation"]},
     {"name": "Envelope Processing", "category": "Batch & File Processing", "func": "check_envelope_processing"},
