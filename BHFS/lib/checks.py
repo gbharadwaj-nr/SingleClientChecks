@@ -122,7 +122,8 @@ def check_api_latency(logs_client, log_group: str, lookback_minutes: int) -> dic
     query = (
         "fields @timestamp, @logStream, @message\n"
         "| filter @message like /(?i)(latency|response time|api_rest_response|request completed)/\n"
-        r"| parse @message /(?i)latency[:\s=]+(?P<latency_value>[0-9]+(\.[0-9]+)?)/" "\n"
+        # CWL's `parse` regex is Java-based: named groups are (?<name>...), NOT Python's (?P<name>...).
+        r"| parse @message /(?i)latency[:\s=]+(?<latency_value>[0-9]+(\.[0-9]+)?)/" "\n"
         "| sort @timestamp desc\n"
         "| limit 100"
     )
@@ -231,6 +232,9 @@ def check_envelope_processing(logs_client, log_group: str, lookback_minutes: int
         processing_status = "UNKNOWN"
 
     detail = f"{filename} - status: {processing_status} at {timestamp}"
+    if filename == "unknown file" or processing_status == "UNKNOWN":
+        # Include the raw line so the actual log format can be seen and the regexes above refined.
+        detail += f" - raw: {message[:200]}"
 
     if processing_status in ("FAILED", "FAILURE", "ERROR"):
         return {"status": FAILED, "detail": detail}
