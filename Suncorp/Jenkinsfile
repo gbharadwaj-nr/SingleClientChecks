@@ -1,0 +1,86 @@
+pipeline {
+    agent any
+
+    triggers {
+        cron('H 6 * * *')
+    }
+
+    options {
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '30'))
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+        PYTHONUNBUFFERED = '1'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
+                // checkout scm places the whole repo at the workspace root, so paths
+                // are relative to the repo root here, not to Suncorp/.
+                bat 'pip install -r requirements.txt'
+            }
+        }
+
+        stage('Verify AWS Credentials') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-master-account']
+                ]) {
+                    bat '''
+                    @echo off
+                    aws sts get-caller-identity >nul 2>&1
+                    if %ERRORLEVEL%==0 (
+                        echo AWS Credentials Verified Successfully
+                    ) else (
+                        echo ERROR : AWS Credentials Verification Failed
+                        exit /b 1
+                    )
+                    '''
+                }
+            }
+        }
+
+        stage('Run health checks') {
+            steps {
+                // Injects AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN for the
+                // master account (bootstrap.py assumes the client role from there), plus
+                // TEAMS_WEBHOOK so main.py can post the executive summary to Teams.
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-master-account'],
+                    string(credentialsId: 'teams-webhook', variable: 'TEAMS_WEBHOOK')
+                ]) {
+                    dir('Suncorp') {
+                        bat 'python -u main.py'
+                    }
+                }
+            }
+        }
+
+        stage('Publish report') {
+            steps {
+                archiveArtifacts artifacts: 'Suncorp/output/*.html', fingerprint: true
+                publishHTML(target: [
+                    reportDir: 'Suncorp/output',
+                    reportFiles: 'report.html',
+                    reportName: 'Suncorp AWS Health Check'
+                ])
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
