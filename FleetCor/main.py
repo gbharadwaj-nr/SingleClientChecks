@@ -19,6 +19,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 import config
 from bootstrap import bootstrap, list_all_regions
+from lib.checks import CHECK_FUNCTIONS
 from lib.html_report import render_report
 from lib.logs_insights import extract_messages, extract_stats, find_log_group_region, run_query
 from lib.teams_notification import send_teams_notification
@@ -29,20 +30,21 @@ logger = logging.getLogger(__name__)
 _FAILURE_KEYWORDS = ("fail", "error", "exception", "unavailable", "timeout")
 
 
-def _evaluate_stats_check(check: dict, results: list[list[dict]]) -> tuple[str, bool]:
+def _evaluate_stats_check(check: dict, results: list[list[dict]]) -> tuple[str, bool, list[str]]:
     """Evaluate a `stats`-style query (e.g. UI availability percentage) against a threshold."""
     stats = extract_stats(results)
     raw_value = stats.get(check["stats_field"])
+    evidence = [f"{key}={value}" for key, value in stats.items()]
     if raw_value is None:
-        return check["failure_label"], False
+        return check["failure_label"], False, evidence
 
     try:
         value = float(raw_value)
     except (TypeError, ValueError):
-        return check["failure_label"], False
+        return check["failure_label"], False, evidence
 
     passed = value >= check["stats_threshold"]
-    return (check["success_label"], True) if passed else (check["failure_label"], False)
+    return (check["success_label"], True, evidence) if passed else (check["failure_label"], False, evidence)
 
 
 def _extract_detail(check: dict, messages: list[str]) -> str | None:
@@ -74,36 +76,45 @@ def _get_logs_client(session, log_group: str, all_regions: list[str], region_cac
     return session.client("logs", region_name=region), region
 
 
-def evaluate_check(check: dict, session, all_regions: list[str], region_cache: dict) -> tuple[str, bool | None, str | None]:
-    """Run one check's Logs Insights query and return (status_label, passed, detail).
+def evaluate_check(check: dict, session, all_regions: list[str], region_cache: dict) -> tuple[str, bool | None, str | None, list[str] | None]:
+    """Run one check's Logs Insights query and return (status_label, passed, detail, evidence).
 
     `passed` is None for checks that have no query configured yet. `detail` is an optional
     extra bit of context (e.g. a batch date or filename) pulled from the latest message.
+    `evidence` is the raw log line(s) (or resource summary, for AWS-API checks) backing the
+    result, shown in the HTML report's expandable "View log evidence" panel.
     """
+    if check.get("check_type") == "aws_api":
+        func = CHECK_FUNCTIONS[check["func"]]
+        status_label, passed, detail = func(session, all_regions, check.get("name_filter", ""))
+        evidence = detail.split("; ") if detail else None
+        return status_label, passed, detail, evidence
+
     if not check["query"] or not check["log_group"]:
-        return "Not Configured", None, None
+        return "Not Configured", None, None, None
 
     logs_client, _region = _get_logs_client(session, check["log_group"], all_regions, region_cache)
     if logs_client is None:
-        return check["failure_label"], False, None
+        return check["failure_label"], False, None, None
 
     lookback_minutes = check.get("lookback_minutes", config.QUERY_LOOKBACK_MINUTES)
     results = run_query(logs_client, check["log_group"], check["query"], lookback_minutes)
 
     if check.get("result_type") == "stats":
-        status_label, passed = _evaluate_stats_check(check, results)
-        return status_label, passed, None
+        status_label, passed, evidence = _evaluate_stats_check(check, results)
+        return status_label, passed, None, evidence
 
     messages = extract_messages(results)
 
     if not messages:
-        return check["failure_label"], False, None
+        return check["failure_label"], False, None, None
 
+    evidence = messages[:5]
     has_failure = any(keyword in message.lower() for message in messages for keyword in _FAILURE_KEYWORDS)
     if has_failure:
-        return check["failure_label"], False, None
+        return check["failure_label"], False, None, evidence
 
-    return check["success_label"], True, _extract_detail(check, messages)
+    return check["success_label"], True, _extract_detail(check, messages), evidence
 
 
 def run_checks(session, all_regions: list[str]) -> list[dict]:
@@ -112,11 +123,11 @@ def run_checks(session, all_regions: list[str]) -> list[dict]:
     region_cache: dict[str, str | None] = {}
     for check in config.CHECKS:
         try:
-            status_label, passed, detail = evaluate_check(check, session, all_regions, region_cache)
+            status_label, passed, detail, evidence = evaluate_check(check, session, all_regions, region_cache)
         except Exception:
             logger.exception("Check %s raised an unexpected error", check["name"])
-            status_label, passed, detail = check["failure_label"], False, None
-        results.append({**check, "status_label": status_label, "passed": passed, "detail": detail})
+            status_label, passed, detail, evidence = check["failure_label"], False, None, None
+        results.append({**check, "status_label": status_label, "passed": passed, "detail": detail, "evidence": evidence})
     return results
 
 
@@ -170,7 +181,7 @@ def build_sections(results: list[dict]) -> list[dict]:
             if result["category"] != category:
                 continue
             name, status = format_row(result)
-            rows.append({"status": _ROW_STATUS[result["passed"]], "cells": [name, status]})
+            rows.append({"status": _ROW_STATUS[result["passed"]], "cells": [name, status], "evidence": result.get("evidence")})
         sections.append({"title": category, "columns": [category, "Status"], "rows": rows})
     return sections
 

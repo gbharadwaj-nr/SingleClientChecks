@@ -66,12 +66,12 @@ def run_checks(session, all_regions: list[str]) -> list[dict]:
                     outcome = {"status": "Failed", "detail": f"Log group {log_group} not found in any region"}
                 else:
                     outcome = func(logs_client, log_group, lookback_minutes)
-            status, detail = outcome["status"], outcome["detail"]
+            status, detail, evidence = outcome["status"], outcome["detail"], outcome.get("evidence")
         except Exception:
             logger.exception("Check %s raised an unexpected error", check["name"])
-            status, detail = "Failed", "Unexpected error while running this check"
+            status, detail, evidence = "Failed", "Unexpected error while running this check", None
 
-        results.append({**check, "status": status, "detail": detail})
+        results.append({**check, "status": status, "detail": detail, "evidence": evidence})
     return results
 
 
@@ -103,15 +103,23 @@ def print_report(results: list[dict]) -> None:
 
 
 def build_sections(results: list[dict]) -> list[dict]:
-    """Convert check results into the {title, columns, rows} shape used by the HTML report."""
+    """Convert check results into the {title, columns, rows} shape used by the HTML report.
+
+    The status badge stays a plain status word; any supporting detail/raw log lines are
+    attached as `evidence` for the report's expandable "View log evidence" panel.
+    """
     sections = []
     for category in dict.fromkeys(result["category"] for result in results):
         rows = []
         for result in results:
             if result["category"] != category:
                 continue
-            status_cell = f"{result['status']} - {result['detail']}" if result["detail"] else result["status"]
-            rows.append({"status": _ROW_STATUS[result["status"]], "cells": [result["name"], status_cell]})
+            evidence = result.get("evidence") or ([result["detail"]] if result.get("detail") else None)
+            rows.append({
+                "status": _ROW_STATUS[result["status"]],
+                "cells": [result["name"], result["status"]],
+                "evidence": evidence,
+            })
         sections.append({"title": category, "columns": [category, "Status"], "rows": rows})
     return sections
 

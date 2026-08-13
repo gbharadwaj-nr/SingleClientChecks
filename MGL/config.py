@@ -54,24 +54,31 @@ DB_NAME = os.environ.get("MGL_DB_NAME")
 DB_USER = os.environ.get("MGL_DB_USER")
 DB_PASSWORD = os.environ.get("MGL_DB_PASSWORD")
 
+# Substring match (case-insensitive) used by the ASG/EFS Infra Checks to find production resources.
+INFRA_NAME_FILTER = "production"
+
 # Each entry wires a check's independent function (lib/checks.py) into the report.
-# category groups rows into report sections. "kind" picks how main.py calls func():
+# category groups rows into report sections - every client standardizes on exactly two:
+# "Infra Checks" (EC2/RDS/UI/ASG/EFS - same across all clients) and "Application" (everything
+# client-specific: batch jobs, file feeds, etc). "kind" picks how main.py calls func():
 #   "logs" (default)  -> func(logs_client, log_group, lookback_minutes); needs "log_group" key
 #   "aws_session"     -> func(session, all_regions, lookback_minutes); direct AWS API calls
 #   "standalone"      -> func(lookback_minutes); no AWS calls at all (e.g. a DB connection)
 # All must return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
 CHECKS = [
-    {"name": "UI Availability", "category": "System Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
-    {"name": "EC2 Instance Health", "category": "System Checks", "func": "check_ec2_status", "log_group": "application", "lookback_minutes": 180},
-    {"name": "RDS Status", "category": "System Checks", "func": "check_rds_status", "log_group": "application", "lookback_minutes": 180},
-    {"name": "RDS Pending Maintenance", "category": "System Checks", "func": "check_rds_maintenance", "kind": "aws_session"},
-    {"name": "WorldCheck Download", "category": "Batch & File Processing", "func": "check_worldcheck_download", "log_group": "application"},
-    {"name": "Index Rebuild Status", "category": "Batch & File Processing", "func": "check_index_rebuild", "log_group": "application"},
-    {"name": "Envelope Processing", "category": "Batch & File Processing", "func": "check_envelope_processing", "log_group": "application"},
-    {"name": "Batch Status", "category": "Batch & File Processing", "func": "check_batch_status", "log_group": "application"},
-    {"name": "Acquisition Status", "category": "Batch & File Processing", "func": "check_acquisition_status", "log_group": "application"},
-    {"name": "WLM Status", "category": "Batch & File Processing", "func": "check_wlm_status", "log_group": "application", "lookback_minutes": 720},
+    {"name": "UI Availability", "category": "Infra Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
+    {"name": "EC2 Instance Health", "category": "Infra Checks", "func": "check_ec2_status", "log_group": "application", "lookback_minutes": 180},
+    {"name": "RDS Status", "category": "Infra Checks", "func": "check_rds_status", "log_group": "application", "lookback_minutes": 180},
+    {"name": "RDS Pending Maintenance", "category": "Infra Checks", "func": "check_rds_maintenance", "kind": "aws_session"},
+    {"name": "ASG Health", "category": "Infra Checks", "func": "check_asg_health", "kind": "aws_session"},
+    {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
+    {"name": "WorldCheck Download", "category": "Application", "func": "check_worldcheck_download", "log_group": "application"},
+    {"name": "Index Rebuild Status", "category": "Application", "func": "check_index_rebuild", "log_group": "application"},
+    {"name": "Envelope Processing", "category": "Application", "func": "check_envelope_processing", "log_group": "application"},
+    {"name": "Batch Status", "category": "Application", "func": "check_batch_status", "log_group": "application"},
+    {"name": "Acquisition Status", "category": "Application", "func": "check_acquisition_status", "log_group": "application"},
+    {"name": "WLM Status", "category": "Application", "func": "check_wlm_status", "log_group": "application", "lookback_minutes": 720},
     # Database Validation is disabled until real MGL_DB_* connection details are provided -
-    # re-add {"name": "Database Validation", "category": "Database", "func": "check_database_validation",
+    # re-add {"name": "Database Validation", "category": "Application", "func": "check_database_validation",
     # "kind": "standalone"} once they're configured (lib/db_check.py is still ready to use).
 ]

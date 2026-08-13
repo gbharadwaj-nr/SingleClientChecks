@@ -13,6 +13,10 @@ import re
 import config
 from lib.logs_insights import extract_fields, extract_messages, extract_stats, run_query, run_query_multi
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 HEALTHY = "Healthy"
 WARNING = "Warning"
 FAILED = "Failed"
@@ -65,6 +69,17 @@ def _run_rows(logs_client, log_group: str, filter_clause: str, lookback_minutes:
     return extract_fields(results)
 
 
+def _evidence_lines(rows: list, limit: int = 5) -> list[str]:
+    """Format up to `limit` raw log rows (dicts) or plain message strings for the HTML evidence panel."""
+    lines = []
+    for item in rows[:limit]:
+        if isinstance(item, dict):
+            lines.append(f"{item.get('@timestamp', '')} {item.get('@message', '')}".strip())
+        else:
+            lines.append(item)
+    return lines
+
+
 def _error_search_status(messages: list[str], healthy_detail: str) -> dict:
     """Shared severity rule for "search for error keywords" checks.
 
@@ -76,8 +91,8 @@ def _error_search_status(messages: list[str], healthy_detail: str) -> dict:
 
     latest = messages[0][:200]
     if len(messages) > _ERROR_WARNING_THRESHOLD or any("fatal" in m.lower() for m in messages):
-        return {"status": FAILED, "detail": f"{len(messages)} matching entr{'y' if len(messages) == 1 else 'ies'} - latest: {latest}"}
-    return {"status": WARNING, "detail": f"{len(messages)} matching entr{'y' if len(messages) == 1 else 'ies'} - latest: {latest}"}
+        return {"status": FAILED, "detail": f"{len(messages)} matching entr{'y' if len(messages) == 1 else 'ies'} - latest: {latest}", "evidence": _evidence_lines(messages)}
+    return {"status": WARNING, "detail": f"{len(messages)} matching entr{'y' if len(messages) == 1 else 'ies'} - latest: {latest}", "evidence": _evidence_lines(messages)}
 
 
 def _batch_monitoring_status(rows: list[dict[str, str]], stream: str, batch_name: str) -> dict:
@@ -88,7 +103,7 @@ def _batch_monitoring_status(rows: list[dict[str, str]], stream: str, batch_name
     latest_message = rows[0].get("@message", "")
     has_failure = any(keyword in latest_message.lower() for keyword in _FAILURE_KEYWORDS)
     status = FAILED if has_failure else HEALTHY
-    return {"status": status, "detail": f"Latest batch status: {latest_message[:200]}"}
+    return {"status": status, "detail": f"Latest batch status: {latest_message[:200]}", "evidence": _evidence_lines(rows)}
 
 
 def check_ec2_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -100,8 +115,8 @@ def check_ec2_status(logs_client, log_group: str, lookback_minutes: int) -> dict
     messages = [row.get("@message", "") for row in rows]
     failing = [m for m in messages if any(keyword in m.lower() for keyword in _FAILURE_KEYWORDS)]
     if failing:
-        return {"status": FAILED, "detail": f"{len(failing)} EC2 instance issue(s) - latest: {failing[0][:200]}"}
-    return {"status": HEALTHY, "detail": messages[0][:200]}
+        return {"status": FAILED, "detail": f"{len(failing)} EC2 instance issue(s) - latest: {failing[0][:200]}", "evidence": _evidence_lines(rows)}
+    return {"status": HEALTHY, "detail": messages[0][:200], "evidence": _evidence_lines(rows)}
 
 
 def check_rds_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -113,8 +128,8 @@ def check_rds_status(logs_client, log_group: str, lookback_minutes: int) -> dict
     messages = [row.get("@message", "") for row in rows]
     failing = [m for m in messages if any(keyword in m.lower() for keyword in _FAILURE_KEYWORDS)]
     if failing:
-        return {"status": FAILED, "detail": f"{len(failing)} RDS issue(s) - latest: {failing[0][:200]}"}
-    return {"status": HEALTHY, "detail": messages[0][:200]}
+        return {"status": FAILED, "detail": f"{len(failing)} RDS issue(s) - latest: {failing[0][:200]}", "evidence": _evidence_lines(rows)}
+    return {"status": HEALTHY, "detail": messages[0][:200], "evidence": _evidence_lines(rows)}
 
 
 def check_api_latency(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -149,12 +164,13 @@ def check_api_latency(logs_client, log_group: str, lookback_minutes: int) -> dic
 
     min_ms, max_ms, avg_ms = min(latencies), max(latencies), sum(latencies) / len(latencies)
     detail = f"Min {min_ms:.0f}ms / Avg {avg_ms:.0f}ms / Max {max_ms:.0f}ms (n={len(latencies)})"
+    evidence = _evidence_lines(rows)
 
     if max_ms >= config.API_LATENCY_FAILED_MS:
-        return {"status": FAILED, "detail": detail}
+        return {"status": FAILED, "detail": detail, "evidence": evidence}
     if max_ms >= config.API_LATENCY_WARNING_MS or avg_ms >= config.API_LATENCY_WARNING_MS:
-        return {"status": WARNING, "detail": detail}
-    return {"status": HEALTHY, "detail": detail}
+        return {"status": WARNING, "detail": detail, "evidence": evidence}
+    return {"status": HEALTHY, "detail": detail, "evidence": evidence}
 
 
 def check_ui_availability(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -177,12 +193,13 @@ def check_ui_availability(logs_client, log_group: str, lookback_minutes: int) ->
     up_count = stats.get("UI_Is_Up_Count", "0")
     down_count = stats.get("UI_Is_Down_Count", "0")
     detail = f"{pct:.1f}% available (success={up_count}, failure={down_count})"
+    evidence = [detail]
 
     if pct >= 100.0:
-        return {"status": HEALTHY, "detail": detail}
+        return {"status": HEALTHY, "detail": detail, "evidence": evidence}
     if pct >= config.UI_AVAILABILITY_WARNING_PCT:
-        return {"status": WARNING, "detail": detail}
-    return {"status": FAILED, "detail": detail}
+        return {"status": WARNING, "detail": detail, "evidence": evidence}
+    return {"status": FAILED, "detail": detail, "evidence": evidence}
 
 
 def check_factiva_import(logs_client, log_groups: list[str], lookback_minutes: int) -> dict:
@@ -205,7 +222,7 @@ def check_factiva_import(logs_client, log_groups: list[str], lookback_minutes: i
     log_stream = rows[0].get("@logStream", "")
     filename_match = re.search(r"([\w\-]+\.(?:txt|csv|zip|dat))", message, re.IGNORECASE)
     filename = filename_match.group(1) if filename_match else "unknown file"
-    return {"status": HEALTHY, "detail": f"{filename} imported at {timestamp} ({log_stream})"}
+    return {"status": HEALTHY, "detail": f"{filename} imported at {timestamp} ({log_stream})", "evidence": _evidence_lines(rows)}
 
 
 def check_envelope_processing(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -235,12 +252,13 @@ def check_envelope_processing(logs_client, log_group: str, lookback_minutes: int
     if filename == "unknown file" or processing_status == "UNKNOWN":
         # Include the raw line so the actual log format can be seen and the regexes above refined.
         detail += f" - raw: {message[:200]}"
+    evidence = _evidence_lines(rows)
 
     if processing_status in ("FAILED", "FAILURE", "ERROR"):
-        return {"status": FAILED, "detail": detail}
+        return {"status": FAILED, "detail": detail, "evidence": evidence}
     if processing_status in ("SUCCESS", "COMPLETED", "COMPLETE", "OK"):
-        return {"status": HEALTHY, "detail": detail}
-    return {"status": WARNING, "detail": detail}
+        return {"status": HEALTHY, "detail": detail, "evidence": evidence}
+    return {"status": WARNING, "detail": detail, "evidence": evidence}
 
 
 def check_aml_batch(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -269,8 +287,8 @@ def check_acq_success(logs_client, log_group: str, lookback_minutes: int) -> dic
 
     latest_message = rows[0].get("@message", "")
     if "acq_success" in latest_message.lower() or "success" in latest_message.lower():
-        return {"status": HEALTHY, "detail": latest_message[:200]}
-    return {"status": WARNING, "detail": f"check_acq_success.log has activity but no success flag - latest: {latest_message[:200]}"}
+        return {"status": HEALTHY, "detail": latest_message[:200], "evidence": _evidence_lines(rows)}
+    return {"status": WARNING, "detail": f"check_acq_success.log has activity but no success flag - latest: {latest_message[:200]}", "evidence": _evidence_lines(rows)}
 
 
 def check_transaction_file(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -292,8 +310,8 @@ def check_transaction_file(logs_client, log_group: str, lookback_minutes: int) -
 
     count_match = re.search(r"(?i)(\d+)\s*records?\s*within", message) or re.search(r"(?i)record\s*count\D{0,10}(\d+)", message)
     if count_match:
-        return {"status": HEALTHY, "detail": f"{filename} - {count_match.group(1)} records at {timestamp}"}
-    return {"status": WARNING, "detail": f"{filename} found at {timestamp} but record count could not be parsed"}
+        return {"status": HEALTHY, "detail": f"{filename} - {count_match.group(1)} records at {timestamp}", "evidence": _evidence_lines(rows)}
+    return {"status": WARNING, "detail": f"{filename} found at {timestamp} but record count could not be parsed", "evidence": _evidence_lines(rows)}
 
 
 def check_bad_files(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -308,7 +326,7 @@ def check_bad_files(logs_client, log_group: str, lookback_minutes: int) -> dict:
     latest_message = rows[0].get("@message", "")
     filename_match = re.search(r"(NetReveal_BAD\S*\.ZIP)", latest_message, re.IGNORECASE)
     filename = filename_match.group(1) if filename_match else latest_message[:150]
-    return {"status": HEALTHY, "detail": f"Latest bad file: {filename}"}
+    return {"status": HEALTHY, "detail": f"Latest bad file: {filename}", "evidence": _evidence_lines(rows)}
 
 
 def check_application_log(logs_client, log_group: str, lookback_minutes: int) -> dict:
@@ -340,8 +358,79 @@ def check_realtime_processing(logs_client, log_group: str, lookback_minutes: int
     failure_keywords = ("fail", "error", "exception", "timeout")
     failures = [m for m in messages if any(keyword in m.lower() for keyword in failure_keywords)]
     if failures:
-        return {"status": FAILED, "detail": f"{len(failures)} real-time processing failure(s) - latest: {failures[0][:150]}"}
-    return {"status": HEALTHY, "detail": f"{len(messages)} real-time processing entries, no failures detected"}
+        return {"status": FAILED, "detail": f"{len(failures)} real-time processing failure(s) - latest: {failures[0][:150]}", "evidence": _evidence_lines(failures)}
+    return {"status": HEALTHY, "detail": f"{len(messages)} real-time processing entries, no failures detected", "evidence": _evidence_lines(messages)}
+
+
+def check_asg_health(session, all_regions: list[str], lookback_minutes: int) -> dict:
+    """Discover Auto Scaling groups whose name contains config.INFRA_NAME_FILTER, across all regions."""
+    name_filter = config.INFRA_NAME_FILTER
+    groups = []
+    for region in all_regions:
+        client = session.client("autoscaling", region_name=region)
+        try:
+            paginator = client.get_paginator("describe_auto_scaling_groups")
+            for page in paginator.paginate():
+                for group in page.get("AutoScalingGroups", []):
+                    if name_filter.lower() in group.get("AutoScalingGroupName", "").lower():
+                        groups.append((region, group))
+        except Exception:
+            logger.exception("Failed to describe Auto Scaling groups in %s", region)
+            continue
+
+    if not groups:
+        return {"status": FAILED, "detail": f"No Auto Scaling groups matching '{name_filter}' found"}
+
+    details = []
+    unhealthy_total = 0
+    for region, group in groups:
+        instances = group.get("Instances", [])
+        in_service = sum(1 for i in instances if i.get("LifecycleState") == "InService")
+        unhealthy = sum(1 for i in instances if i.get("HealthStatus") != "Healthy")
+        unhealthy_total += unhealthy
+        details.append(
+            f"{group.get('AutoScalingGroupName', '')}: desired={group.get('DesiredCapacity', 0)} "
+            f"min={group.get('MinSize', 0)} max={group.get('MaxSize', 0)} in_service={in_service} "
+            f"unhealthy={unhealthy} region={region}"
+        )
+
+    status = HEALTHY if unhealthy_total == 0 else FAILED
+    return {"status": status, "detail": "; ".join(details)[:500], "evidence": details}
+
+
+def check_efs_health(session, all_regions: list[str], lookback_minutes: int) -> dict:
+    """Discover EFS file systems whose Name tag contains config.INFRA_NAME_FILTER, across all regions."""
+    name_filter = config.INFRA_NAME_FILTER
+    file_systems = []
+    for region in all_regions:
+        client = session.client("efs", region_name=region)
+        try:
+            paginator = client.get_paginator("describe_file_systems")
+            for page in paginator.paginate():
+                for fs in page.get("FileSystems", []):
+                    if name_filter.lower() in fs.get("Name", "").lower():
+                        file_systems.append((region, fs))
+        except Exception:
+            logger.exception("Failed to describe EFS file systems in %s", region)
+            continue
+
+    if not file_systems:
+        return {"status": FAILED, "detail": f"No EFS file systems matching '{name_filter}' found"}
+
+    details = []
+    unavailable_total = 0
+    for region, fs in file_systems:
+        life_cycle_state = fs.get("LifeCycleState", "unknown")
+        if life_cycle_state != "available":
+            unavailable_total += 1
+        size_gb = fs.get("SizeInBytes", {}).get("Value", 0) / (1024 ** 3)
+        details.append(
+            f"{fs.get('Name') or fs.get('FileSystemId', '')}: state={life_cycle_state} "
+            f"size={size_gb:.2f}GB region={region}"
+        )
+
+    status = HEALTHY if unavailable_total == 0 else FAILED
+    return {"status": status, "detail": "; ".join(details)[:500], "evidence": details}
 
 
 # Maps config.CHECKS[i]["func"] (a string) to the actual function, so main.py doesn't
@@ -361,4 +450,6 @@ CHECK_FUNCTIONS = {
     "check_bad_files": check_bad_files,
     "check_application_log": check_application_log,
     "check_realtime_processing": check_realtime_processing,
+    "check_asg_health": check_asg_health,
+    "check_efs_health": check_efs_health,
 }

@@ -58,7 +58,16 @@
                     <tr class="status-{{ row.status | default('ok') }}">
                         {% for cell in row.cells %}
                         {% if loop.last %}
-                        <td><span class="badge badge--{{ row.status | default('ok') }}">{{ cell }}</span></td>
+                        <td>
+                            <span class="badge badge--{{ row.status | default('ok') }}">{{ cell }}</span>
+                            {% if row.evidence %}
+                            <details class="log-evidence">
+                                <summary>View log evidence</summary>
+                                <pre>{% for line in row.evidence %}{{ line }}
+{% endfor %}</pre>
+                            </details>
+                            {% endif %}
+                        </td>
                         {% else %}
                         <td>{{ cell }}</td>
                         {% endif %}

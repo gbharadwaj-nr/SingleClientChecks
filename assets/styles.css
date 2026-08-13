@@ -201,9 +201,17 @@ tr.status-error td:first-child {
     white-space: nowrap;
 }
 
+.badge::before {
+    margin-right: 5px;
+}
+
 .badge--ok {
     background-color: var(--ok-bg);
     color: var(--ok);
+}
+
+.badge--ok::before {
+    content: "\2713";
 }
 
 .badge--warning {
@@ -211,9 +219,61 @@ tr.status-error td:first-child {
     color: var(--warning);
 }
 
+.badge--warning::before {
+    content: "\26A0";
+}
+
 .badge--error {
     background-color: var(--error-bg);
     color: var(--error);
+}
+
+.badge--error::before {
+    content: "\2715";
+}
+
+.log-evidence {
+    margin-top: 6px;
+}
+
+.log-evidence summary {
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+    list-style: none;
+    user-select: none;
+}
+
+.log-evidence summary::-webkit-details-marker {
+    display: none;
+}
+
+.log-evidence summary::before {
+    content: "\25B8 ";
+}
+
+.log-evidence[open] summary::before {
+    content: "\25BE ";
+}
+
+.log-evidence summary:hover {
+    color: var(--brand-blue);
+}
+
+.log-evidence pre {
+    margin: 6px 0 0;
+    padding: 10px 12px;
+    background: #0d1117;
+    color: #c9d1d9;
+    border-radius: 6px;
+    font-family: "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .report-footer {

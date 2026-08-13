@@ -54,24 +54,27 @@ def run_checks(session, all_regions: list[str]) -> list[dict]:
         func = CHECK_FUNCTIONS[check["func"]]
         lookback_minutes = check.get("lookback_minutes", config.QUERY_LOOKBACK_MINUTES)
 
-        if "log_groups" in check:
-            # Multi-log-group check (e.g. Factiva Import): all groups must share one region.
-            target = [config.LOG_GROUPS[key] for key in check["log_groups"]]
-            logs_client = _get_logs_client(session, target[0], all_regions, region_cache)
-        else:
-            target = config.LOG_GROUPS[check.get("log_group", "application")]
-            logs_client = _get_logs_client(session, target, all_regions, region_cache)
+        try:
+            if check.get("kind") == "aws_session":
+                outcome = func(session, all_regions, lookback_minutes)
+            else:
+                if "log_groups" in check:
+                    # Multi-log-group check (e.g. Factiva Import): all groups must share one region.
+                    target = [config.LOG_GROUPS[key] for key in check["log_groups"]]
+                    logs_client = _get_logs_client(session, target[0], all_regions, region_cache)
+                else:
+                    target = config.LOG_GROUPS[check.get("log_group", "application")]
+                    logs_client = _get_logs_client(session, target, all_regions, region_cache)
 
-        if logs_client is None:
-            status, detail = "Failed", f"Log group(s) {target} not found in any region"
-        else:
-            try:
-                outcome = func(logs_client, target, lookback_minutes)
-                status, detail = outcome["status"], outcome["detail"]
-            except Exception:
-                logger.exception("Check %s raised an unexpected error", check["name"])
-                status, detail = "Failed", "Unexpected error while running this check"
-        results.append({**check, "status": status, "detail": detail})
+                if logs_client is None:
+                    outcome = {"status": "Failed", "detail": f"Log group(s) {target} not found in any region"}
+                else:
+                    outcome = func(logs_client, target, lookback_minutes)
+            status, detail, evidence = outcome["status"], outcome["detail"], outcome.get("evidence")
+        except Exception:
+            logger.exception("Check %s raised an unexpected error", check["name"])
+            status, detail, evidence = "Failed", "Unexpected error while running this check", None
+        results.append({**check, "status": status, "detail": detail, "evidence": evidence})
     return results
 
 
@@ -103,15 +106,23 @@ def print_report(results: list[dict]) -> None:
 
 
 def build_sections(results: list[dict]) -> list[dict]:
-    """Convert check results into the {title, columns, rows} shape used by the HTML report."""
+    """Convert check results into the {title, columns, rows} shape used by the HTML report.
+
+    The status badge stays a plain status word; any supporting detail/raw log lines are
+    attached as `evidence` for the report's expandable "View log evidence" panel.
+    """
     sections = []
     for category in dict.fromkeys(result["category"] for result in results):
         rows = []
         for result in results:
             if result["category"] != category:
                 continue
-            status_cell = f"{result['status']} - {result['detail']}" if result["detail"] else result["status"]
-            rows.append({"status": _ROW_STATUS[result["status"]], "cells": [result["name"], status_cell]})
+            evidence = result.get("evidence") or ([result["detail"]] if result.get("detail") else None)
+            rows.append({
+                "status": _ROW_STATUS[result["status"]],
+                "cells": [result["name"], result["status"]],
+                "evidence": evidence,
+            })
         sections.append({"title": category, "columns": [category, "Status"], "rows": rows})
     return sections
 

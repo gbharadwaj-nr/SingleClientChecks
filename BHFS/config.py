@@ -45,25 +45,34 @@ API_LATENCY_WARNING_MS = 1000.0
 API_LATENCY_FAILED_MS = 3000.0
 UI_AVAILABILITY_WARNING_PCT = 95.0
 
+# Substring match (case-insensitive) used by the ASG/EFS Infra Checks to find production resources.
+INFRA_NAME_FILTER = "production"
+
 # Each entry wires a check's independent function (lib/checks.py) into the report.
-# category groups rows into report sections; log_group is a key into LOG_GROUPS (defaults to
-# "application" in main.py if omitted); log_groups (list of LOG_GROUPS keys) instead runs the
-# check across several log groups at once via run_query_multi(). func(logs_client, log_group(s),
-# lookback_minutes) must return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
+# category groups rows into report sections - every client standardizes on exactly two:
+# "Infra Checks" (EC2/RDS/UI/ASG/EFS - same across all clients) and "Application" (everything
+# client-specific: batch jobs, file feeds, error monitoring, etc). log_group is a key into
+# LOG_GROUPS (defaults to "application" in main.py if omitted); log_groups (list of LOG_GROUPS
+# keys) instead runs the check across several log groups at once via run_query_multi(). "kind":
+# "aws_session" calls func(session, all_regions, lookback_minutes) directly (no log group
+# involved); otherwise func(logs_client, log_group(s), lookback_minutes) is used. All must
+# return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
 CHECKS = [
-    {"name": "EC2 Instance Health", "category": "System Checks", "func": "check_ec2_status", "log_group": "application", "lookback_minutes": 180},
-    {"name": "RDS Database Health", "category": "System Checks", "func": "check_rds_status", "log_group": "application", "lookback_minutes": 180},
-    {"name": "UI Availability", "category": "System Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
-    {"name": "Factiva Import", "category": "Batch & File Processing", "func": "check_factiva_import", "log_groups": ["application", "system", "cloudformation"]},
-    {"name": "Envelope Processing", "category": "Batch & File Processing", "func": "check_envelope_processing"},
-    {"name": "AML Batch", "category": "Batch & File Processing", "func": "check_aml_batch"},
-    {"name": "WLM Batch", "category": "Batch & File Processing", "func": "check_wlm_batch"},
-    {"name": "CDD Batch", "category": "Batch & File Processing", "func": "check_cdd_batch"},
-    {"name": "ACQ Success", "category": "Batch & File Processing", "func": "check_acq_success"},
-    {"name": "Transaction File", "category": "Batch & File Processing", "func": "check_transaction_file"},
-    {"name": "Bad Files", "category": "Feedback Files", "func": "check_bad_files"},
-    {"name": "Application Errors & Notifications", "category": "Error Monitoring", "func": "check_application_log"},
-    {"name": "Real-Time API Latency", "category": "Real-Time Processing", "func": "check_api_latency"},
-    {"name": "Real-Time Processing", "category": "Real-Time Processing", "func": "check_realtime_processing"},
+    {"name": "EC2 Instance Health", "category": "Infra Checks", "func": "check_ec2_status", "log_group": "application", "lookback_minutes": 180},
+    {"name": "RDS Database Health", "category": "Infra Checks", "func": "check_rds_status", "log_group": "application", "lookback_minutes": 180},
+    {"name": "UI Availability", "category": "Infra Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
+    {"name": "ASG Health", "category": "Infra Checks", "func": "check_asg_health", "kind": "aws_session"},
+    {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
+    {"name": "Factiva Import", "category": "Application", "func": "check_factiva_import", "log_groups": ["application", "system", "cloudformation"]},
+    {"name": "Envelope Processing", "category": "Application", "func": "check_envelope_processing"},
+    {"name": "AML Batch", "category": "Application", "func": "check_aml_batch"},
+    {"name": "WLM Batch", "category": "Application", "func": "check_wlm_batch"},
+    {"name": "CDD Batch", "category": "Application", "func": "check_cdd_batch"},
+    {"name": "ACQ Success", "category": "Application", "func": "check_acq_success"},
+    {"name": "Transaction File", "category": "Application", "func": "check_transaction_file"},
+    {"name": "Bad Files", "category": "Application", "func": "check_bad_files"},
+    {"name": "Application Errors & Notifications", "category": "Application", "func": "check_application_log"},
+    {"name": "Real-Time API Latency", "category": "Application", "func": "check_api_latency"},
+    {"name": "Real-Time Processing", "category": "Application", "func": "check_realtime_processing"},
 ]
 

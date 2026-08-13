@@ -27,32 +27,6 @@ QUERY_LOOKBACK_MINUTES = 1440  # 24 hours
 # that aren't wired up yet - they are reported as "Not Configured" until added.
 CHECKS = [
     {
-        "name": "RDS",
-        "category": "Infra Checks",
-        "log_group": LOG_GROUPS["application"],
-        "query": (
-            "fields @message\n"
-            "| filter @logStream like /check_rds_status.log/\n"
-            "| sort @timestamp desc\n"
-            "| limit 2"
-        ),
-        "success_label": "Available",
-        "failure_label": "Unavailable",
-    },
-    {
-        "name": "EC2 Instances",
-        "category": "Infra Checks",
-        "log_group": LOG_GROUPS["application"],
-        "query": (
-            "fields @message\n"
-            "| filter @logStream like /check_ec2_status.log/\n"
-            "| sort @timestamp desc\n"
-            "| limit 3"
-        ),
-        "success_label": "Available",
-        "failure_label": "Unavailable",
-    },
-    {
         "name": "UI",
         "category": "Infra Checks",
         "log_group": LOG_GROUPS["ui"],
@@ -72,6 +46,32 @@ CHECKS = [
         "failure_label": "Unavailable",
     },
     {
+        "name": "EC2 Instances",
+        "category": "Infra Checks",
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /check_ec2_status.log/\n"
+            "| sort @timestamp desc\n"
+            "| limit 3"
+        ),
+        "success_label": "Available",
+        "failure_label": "Unavailable",
+    },
+    {
+        "name": "RDS",
+        "category": "Infra Checks",
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /check_rds_status.log/\n"
+            "| sort @timestamp desc\n"
+            "| limit 2"
+        ),
+        "success_label": "Available",
+        "failure_label": "Unavailable",
+    },
+    {
         # Maps to the "AML Batch Monitoring" dashboard widget.
         "name": "AML Batch",
         "category": "Infra Checks",
@@ -87,9 +87,25 @@ CHECKS = [
         "failure_label": "Failed",
     },
     {
+        # Direct AWS API check (autoscaling:DescribeAutoScalingGroups), not a log query.
+        "name": "ASG Health",
+        "category": "Infra Checks",
+        "check_type": "aws_api",
+        "func": "check_asg_health",
+        "name_filter": "production",
+    },
+    {
+        # Direct AWS API check (elasticfilesystem:DescribeFileSystems), not a log query.
+        "name": "EFS Health",
+        "category": "Infra Checks",
+        "check_type": "aws_api",
+        "func": "check_efs_health",
+        "name_filter": "production",
+    },
+    {
         # Maps to the "runBatch.log" batch instance log stream (acq_success flag creation).
         "name": "ACQ Success Flag",
-        "category": "Batch Processing",
+        "category": "Application",
         "log_group": LOG_GROUPS["application"],
         "query": (
             "fields @message\n"
@@ -106,7 +122,7 @@ CHECKS = [
     {
         # Maps to the "runBatch.log" batch instance log stream (aml_success flag creation).
         "name": "AML Success Flag",
-        "category": "Batch Processing",
+        "category": "Application",
         "log_group": LOG_GROUPS["application"],
         "query": (
             "fields @message\n"
@@ -123,7 +139,7 @@ CHECKS = [
     {
         # Maps to the "runBatch.log" batch instance log stream (NetReveal BAD file copy/flag creation).
         "name": "Bad Records Flag",
-        "category": "Batch Processing",
+        "category": "Application",
         "log_group": LOG_GROUPS["application"],
         "query": (
             "fields @message\n"
