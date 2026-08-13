@@ -7,7 +7,7 @@ report. Log-based functions share `_run_stream()` (single-stream query + field e
 """
 
 import logging
-import re
+from datetime import datetime, timedelta, timezone
 
 import config
 from lib.db_check import run_database_validation
@@ -56,6 +56,13 @@ def _evidence_lines(rows: list, limit: int = 5) -> list[str]:
     return lines
 
 
+def _name_matches(name: str, filters) -> bool:
+    """True if every substring in `filters` (a str, or list/tuple of strs) appears in `name`."""
+    required = [filters] if isinstance(filters, str) else list(filters)
+    name_lower = name.lower()
+    return all(f.lower() in name_lower for f in required)
+
+
 def check_ui_availability(logs_client, log_group: str, lookback_minutes: int) -> dict:
     """UI availability Lambda log group: success/failure counts and availability percentage."""
     query = (
@@ -77,134 +84,38 @@ def check_ui_availability(logs_client, log_group: str, lookback_minutes: int) ->
     return {"status": HEALTHY if pct >= 100.0 else FAILED, "detail": detail, "evidence": [detail]}
 
 
-def check_rds_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """check_rds_status.log: verify RDS database health."""
-    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["rds_status"], lookback_minutes, limit=2)
-    if not rows:
-        return {"status": FAILED, "detail": "No RDS status entries found in check_rds_status.log"}
-
-    messages = [row.get("@message", "") for row in rows]
-    failing = [m for m in messages if any(keyword in m.lower() for keyword in _FAILURE_KEYWORDS)]
-    if failing:
-        return {"status": FAILED, "detail": f"{len(failing)} RDS issue(s) - latest: {failing[0][:200]}", "evidence": _evidence_lines(rows)}
-    return {"status": HEALTHY, "detail": messages[0][:200], "evidence": _evidence_lines(rows)}
-
-
-def check_ec2_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """check_ec2_status.log: verify EC2 instance health."""
-    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["ec2_status"], lookback_minutes, limit=3)
-    if not rows:
-        return {"status": FAILED, "detail": "No EC2 status entries found in check_ec2_status.log"}
-
-    messages = [row.get("@message", "") for row in rows]
-    failing = [m for m in messages if any(keyword in m.lower() for keyword in _FAILURE_KEYWORDS)]
-    if failing:
-        return {"status": FAILED, "detail": f"{len(failing)} EC2 instance issue(s) - latest: {failing[0][:200]}", "evidence": _evidence_lines(rows)}
-    return {"status": HEALTHY, "detail": messages[0][:200], "evidence": _evidence_lines(rows)}
-
-
-def check_worldcheck_download(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """runBatch.log: verify the daily WorldCheck download completed; extract status and timestamp."""
-    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes, limit=20)
-    if not rows:
-        return {"status": FAILED, "detail": "No runBatch.log activity found"}
-
-    candidates = [r for r in rows if "worldcheck" in r.get("@message", "").lower()] or rows
-    latest = candidates[0]
-    message, timestamp = latest.get("@message", ""), latest.get("@timestamp", "")
-
-    if any(keyword in message.lower() for keyword in _FAILURE_KEYWORDS):
-        return {"status": FAILED, "detail": f"{message[:200]} at {timestamp}", "evidence": _evidence_lines(rows)}
-    if any(keyword in message.lower() for keyword in ("success", "complete", "done")):
-        return {"status": HEALTHY, "detail": f"{message[:200]} at {timestamp}", "evidence": _evidence_lines(rows)}
-    return {"status": WARNING, "detail": f"Ambiguous download status - {message[:200]} at {timestamp}", "evidence": _evidence_lines(rows)}
-
-
-def check_index_rebuild(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """norkom.log: count 'Build totCount:' index rebuild events; report count and latest status."""
+def check_worldcheck_import(logs_client, log_group: str, lookback_minutes: int) -> dict:
+    """norkom.log: World-Check file processing and import-completion activity."""
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["norkom"], lookback_minutes,
-        limit=100, message_filter="@message like /Build totCount:/",
+        limit=20, message_filter="@message like /Processing World-Check file/ or @message like /End of Worldcheck List import/",
     )
     if not rows:
-        return {"status": FAILED, "detail": "No 'Build totCount:' index rebuild events found in norkom.log"}
-
-    latest_message, latest_timestamp = rows[0].get("@message", ""), rows[0].get("@timestamp", "")
-    has_failure = any(keyword in row.get("@message", "").lower() for row in rows for keyword in _FAILURE_KEYWORDS)
-    detail = f"{len(rows)} rebuild event(s) - latest: {latest_message[:200]} at {latest_timestamp}"
-    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows)}
-
-
-def check_envelope_processing(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """pollDXVLanding.log: detect envelope arrival; extract envelope filename and timestamp."""
-    rows = _run_stream(
-        logs_client, log_group, config.LOG_STREAMS["poll_dxv_landing"], lookback_minutes,
-        limit=20, message_filter="@message like /Processing envelope/",
-    )
-    if not rows:
-        return {"status": FAILED, "detail": "No 'Processing envelope' entries found in pollDXVLanding.log"}
-
-    message, timestamp = rows[0].get("@message", ""), rows[0].get("@timestamp", "")
-    filename_match = re.search(r"(ENVELOPE_\d{8}\.ZIP\.pgp)", message, re.IGNORECASE)
-    filename = filename_match.group(1) if filename_match else message[:150]
-    return {"status": HEALTHY, "detail": f"{filename} received at {timestamp}", "evidence": _evidence_lines(rows)}
-
-
-def check_batch_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """getDXVLandingFiles.log: confirm batch processing started after envelope arrival."""
-    rows = _run_stream(logs_client, log_group, config.LOG_STREAMS["get_dxv_landing_files"], lookback_minutes, limit=100)
-    if not rows:
-        return {"status": FAILED, "detail": "No batch activity found in getDXVLandingFiles.log"}
+        return {"status": FAILED, "detail": "No World-Check import activity found in norkom.log"}
 
     messages = [row.get("@message", "") for row in rows]
-    failing = [m for m in messages if any(keyword in m.lower() for keyword in _FAILURE_KEYWORDS)]
-    if failing:
-        return {"status": FAILED, "detail": f"{len(failing)} batch issue(s) - latest: {failing[0][:200]}", "evidence": _evidence_lines(rows)}
-
+    has_failure = any(keyword in m.lower() for m in messages for keyword in _FAILURE_KEYWORDS)
+    completed = any("end of worldcheck list import" in m.lower() for m in messages)
+    status = FAILED if has_failure else HEALTHY if completed else WARNING
     plural = "y" if len(rows) == 1 else "ies"
-    return {"status": HEALTHY, "detail": f"Batch activity detected ({len(rows)} entr{plural}) - latest: {messages[0][:200]}", "evidence": _evidence_lines(rows)}
+    detail = f"{len(rows)} World-Check import entr{plural} - latest: {messages[0][:200]}"
+    return {"status": status, "detail": detail, "evidence": _evidence_lines(rows)}
 
 
-def check_acquisition_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """getDXVLandingFiles.log: confirm the Acquisition batch stage started."""
-    rows = _run_stream(
-        logs_client, log_group, config.LOG_STREAMS["get_dxv_landing_files"], lookback_minutes,
-        limit=100, message_filter="@message like /Acquisition/",
-    )
-    if not rows:
-        return {"status": FAILED, "detail": "No Acquisition batch activity found in getDXVLandingFiles.log"}
-
-    message, timestamp = rows[0].get("@message", ""), rows[0].get("@timestamp", "")
-    if any(keyword in message.lower() for keyword in _FAILURE_KEYWORDS):
-        return {"status": FAILED, "detail": f"{message[:200]} at {timestamp}", "evidence": _evidence_lines(rows)}
-    return {"status": HEALTHY, "detail": f"Acquisition started at {timestamp} - {message[:150]}", "evidence": _evidence_lines(rows)}
-
-
-def check_wlm_status(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """runBatch.log: verify the WLM batch completed successfully; cross-check against
-    the index rebuild completion in norkom.log (requirement: WLM runs only after it)."""
+def check_runbatch_activity(logs_client, log_group: str, lookback_minutes: int) -> dict:
+    """runBatch.log: batch file/flag creation activity - lists every matching log line."""
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
-        limit=20, message_filter="@message like /WLM Batch/",
+        limit=50, message_filter="@message like /Creating/",
     )
     if not rows:
-        return {"status": FAILED, "detail": "No 'WLM Batch' entries found in runBatch.log"}
+        return {"status": FAILED, "detail": "No 'Creating' activity found in runBatch.log"}
 
-    message, timestamp = rows[0].get("@message", ""), rows[0].get("@timestamp", "")
-    if any(keyword in message.lower() for keyword in _FAILURE_KEYWORDS):
-        return {"status": FAILED, "detail": f"{message[:200]} at {timestamp}", "evidence": _evidence_lines(rows)}
-    if "success" not in message.lower():
-        return {"status": WARNING, "detail": f"Ambiguous WLM batch status - {message[:200]} at {timestamp}", "evidence": _evidence_lines(rows)}
-
-    index_rows = _run_stream(
-        logs_client, log_group, config.LOG_STREAMS["norkom"], lookback_minutes,
-        limit=10, message_filter="@message like /Finished executing procedure IndexReportProcedure/",
-    )
-    if not index_rows:
-        return {"status": WARNING, "detail": f"{message[:150]} at {timestamp}, but IndexReportProcedure completion not found in norkom.log", "evidence": _evidence_lines(rows)}
-
-    index_ts = index_rows[0].get("@timestamp", "")
-    return {"status": HEALTHY, "detail": f"{message[:150]} at {timestamp}; IndexReportProcedure finished at {index_ts}", "evidence": _evidence_lines(rows + index_rows)}
+    messages = [row.get("@message", "") for row in rows]
+    has_failure = any(keyword in m.lower() for m in messages for keyword in _FAILURE_KEYWORDS)
+    plural = "y" if len(rows) == 1 else "ies"
+    detail = f"{len(rows)} file/flag creation entr{plural} found"
+    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
 
 
 def check_rds_maintenance(session, all_regions: list[str], lookback_minutes: int) -> dict:
@@ -243,7 +154,7 @@ def check_asg_health(session, all_regions: list[str], lookback_minutes: int) -> 
             paginator = client.get_paginator("describe_auto_scaling_groups")
             for page in paginator.paginate():
                 for group in page.get("AutoScalingGroups", []):
-                    if name_filter.lower() in group.get("AutoScalingGroupName", "").lower():
+                    if _name_matches(group.get("AutoScalingGroupName", ""), name_filter):
                         groups.append((region, group))
         except Exception:
             logger.exception("Failed to describe Auto Scaling groups in %s", region)
@@ -279,7 +190,7 @@ def check_efs_health(session, all_regions: list[str], lookback_minutes: int) -> 
             paginator = client.get_paginator("describe_file_systems")
             for page in paginator.paginate():
                 for fs in page.get("FileSystems", []):
-                    if name_filter.lower() in fs.get("Name", "").lower():
+                    if _name_matches(fs.get("Name", ""), name_filter):
                         file_systems.append((region, fs))
         except Exception:
             logger.exception("Failed to describe EFS file systems in %s", region)
@@ -304,16 +215,156 @@ def check_efs_health(session, all_regions: list[str], lookback_minutes: int) -> 
     return {"status": status, "detail": "; ".join(details)[:500], "evidence": details}
 
 
+def check_ec2_health(session, all_regions: list[str], lookback_minutes: int) -> dict:
+    """Per-instance EC2 health: state, system/instance status checks, AZ and live CPU, across all regions.
+
+    Only instances whose Name tag matches config.INFRA_NAME_FILTER are considered.
+    """
+    name_filter = config.INFRA_NAME_FILTER
+    instances = []
+    for region in all_regions:
+        ec2 = session.client("ec2", region_name=region)
+        try:
+            paginator = ec2.get_paginator("describe_instances")
+            for page in paginator.paginate():
+                for reservation in page.get("Reservations", []):
+                    for instance in reservation.get("Instances", []):
+                        name = next((t["Value"] for t in instance.get("Tags", []) if t.get("Key") == "Name"), instance["InstanceId"])
+                        if _name_matches(name, name_filter):
+                            instances.append((region, name, instance))
+        except Exception:
+            logger.exception("Failed to describe EC2 instances in %s", region)
+            continue
+
+    if not instances:
+        return {"status": FAILED, "detail": f"No EC2 instances matching '{name_filter}' found"}
+
+    # Group by region so describe_instance_status (region-scoped) is only called once per region.
+    by_region: dict[str, list[tuple[str, dict]]] = {}
+    for region, name, instance in instances:
+        by_region.setdefault(region, []).append((name, instance))
+
+    details = []
+    unhealthy_total = 0
+    for region, named_instances in by_region.items():
+        ec2 = session.client("ec2", region_name=region)
+        cloudwatch = session.client("cloudwatch", region_name=region)
+        instance_ids = [instance["InstanceId"] for _name, instance in named_instances]
+
+        statuses = {}
+        try:
+            paginator = ec2.get_paginator("describe_instance_status")
+            for page in paginator.paginate(InstanceIds=instance_ids, IncludeAllInstances=True):
+                for status in page.get("InstanceStatuses", []):
+                    statuses[status["InstanceId"]] = status
+        except Exception:
+            logger.exception("Failed to describe instance status in %s", region)
+
+        for name, instance in named_instances:
+            instance_id = instance["InstanceId"]
+            state = instance.get("State", {}).get("Name", "unknown")
+            az = instance.get("Placement", {}).get("AvailabilityZone", region)
+            status = statuses.get(instance_id, {})
+            system_status = status.get("SystemStatus", {}).get("Status", "n/a")
+            instance_status = status.get("InstanceStatus", {}).get("Status", "n/a")
+
+            cpu = None
+            try:
+                end = datetime.now(timezone.utc)
+                metrics = cloudwatch.get_metric_statistics(
+                    Namespace="AWS/EC2", MetricName="CPUUtilization",
+                    Dimensions=[{"Name": "InstanceId", "Value": instance_id}],
+                    StartTime=end - timedelta(minutes=15), EndTime=end,
+                    Period=300, Statistics=["Average"],
+                )
+                datapoints = sorted(metrics.get("Datapoints", []), key=lambda d: d["Timestamp"])
+                if datapoints:
+                    cpu = datapoints[-1]["Average"]
+            except Exception:
+                logger.exception("Failed to fetch CPUUtilization for %s in %s", instance_id, region)
+
+            healthy = state == "running" and system_status == "ok" and instance_status == "ok"
+            if not healthy:
+                unhealthy_total += 1
+            cpu_text = f"{cpu:.1f}%" if cpu is not None else "N/A"
+            details.append(
+                f"{name}: state={state} | system={system_status} | instance={instance_status} | "
+                f"az={az} | cpu={cpu_text} ({'HEALTHY' if healthy else 'UNHEALTHY'})"
+            )
+
+    status = HEALTHY if unhealthy_total == 0 else FAILED
+    return {"status": status, "detail": "; ".join(details)[:500], "evidence": details}
+
+
+def check_rds_health(session, all_regions: list[str], lookback_minutes: int) -> dict:
+    """Per-instance RDS health: engine, status, multi-AZ and storage utilization, across all regions.
+
+    Only DB instances whose identifier matches config.INFRA_NAME_FILTER are considered.
+    """
+    name_filter = config.INFRA_NAME_FILTER
+    db_instances = []
+    for region in all_regions:
+        rds = session.client("rds", region_name=region)
+        try:
+            paginator = rds.get_paginator("describe_db_instances")
+            for page in paginator.paginate():
+                for db in page.get("DBInstances", []):
+                    if _name_matches(db.get("DBInstanceIdentifier", ""), name_filter):
+                        db_instances.append((region, db))
+        except Exception:
+            logger.exception("Failed to describe RDS instances in %s", region)
+            continue
+
+    if not db_instances:
+        return {"status": FAILED, "detail": f"No RDS instances matching '{name_filter}' found"}
+
+    details = []
+    unhealthy_total = 0
+    for region, db in db_instances:
+        identifier = db.get("DBInstanceIdentifier", "")
+        engine = db.get("Engine", "unknown")
+        status = db.get("DBInstanceStatus", "unknown")
+        multi_az = db.get("MultiAZ", False)
+        allocated_gb = db.get("AllocatedStorage", 0)
+
+        storage_used_pct = None
+        if allocated_gb:
+            try:
+                cloudwatch = session.client("cloudwatch", region_name=region)
+                end = datetime.now(timezone.utc)
+                metrics = cloudwatch.get_metric_statistics(
+                    Namespace="AWS/RDS", MetricName="FreeStorageSpace",
+                    Dimensions=[{"Name": "DBInstanceIdentifier", "Value": identifier}],
+                    StartTime=end - timedelta(minutes=30), EndTime=end,
+                    Period=300, Statistics=["Average"],
+                )
+                datapoints = sorted(metrics.get("Datapoints", []), key=lambda d: d["Timestamp"])
+                if datapoints:
+                    free_bytes = datapoints[-1]["Average"]
+                    allocated_bytes = allocated_gb * (1024 ** 3)
+                    storage_used_pct = (allocated_bytes - free_bytes) / allocated_bytes * 100
+            except Exception:
+                logger.exception("Failed to fetch FreeStorageSpace for %s in %s", identifier, region)
+
+        healthy = status == "available"
+        if not healthy:
+            unhealthy_total += 1
+        storage_text = f"{storage_used_pct:.1f}%" if storage_used_pct is not None else "N/A"
+        details.append(
+            f"{identifier}: engine={engine} | status={status} | region={region} | "
+            f"multi_az={multi_az} | storage_used={storage_text} | health={'HEALTHY' if healthy else 'UNHEALTHY'}"
+        )
+
+    status = HEALTHY if unhealthy_total == 0 else FAILED
+    return {"status": status, "detail": "; ".join(details)[:500], "evidence": details}
+
+
 CHECK_FUNCTIONS = {
     "check_ui_availability": check_ui_availability,
-    "check_ec2_status": check_ec2_status,
-    "check_rds_status": check_rds_status,
-    "check_worldcheck_download": check_worldcheck_download,
-    "check_index_rebuild": check_index_rebuild,
-    "check_envelope_processing": check_envelope_processing,
-    "check_batch_status": check_batch_status,
-    "check_acquisition_status": check_acquisition_status,
-    "check_wlm_status": check_wlm_status,
+    "check_ec2_health": check_ec2_health,
+    "check_rds_health": check_rds_health,
+    "check_worldcheck_import": check_worldcheck_import,
+    "check_runbatch_activity": check_runbatch_activity,
     "check_rds_maintenance": check_rds_maintenance,
     "check_database_validation": check_database_validation,
     "check_asg_health": check_asg_health,

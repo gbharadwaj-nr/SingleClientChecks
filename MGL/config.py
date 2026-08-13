@@ -26,19 +26,9 @@ LOG_GROUPS = {
 
 # Specific log streams used by the per-stream checks in lib/checks.py.
 LOG_STREAMS = {
-    # Shared by Index Rebuild Completion and WLM Status (index-completion half).
-    "norkom": "batch/i-0a1a72b531032dc24/batch/norkom.log",
-    # Envelope Processing.
-    "poll_dxv_landing": "dmz-/i-078d2fff05b048af1/pollDXVLanding.log",
-    # Batch Status / Acquisition Status / WLM Status (start-order half).
-    "get_dxv_landing_files": "batch/i-0a1a72b531032dc24/batch/getDXVLandingFiles.log",
-    # WorldCheck Daily Download / WLM Status (direct "WLM Batch Success" line). Bare filename
-    # (not the full instance-specific path) so it still matches if the EC2 instance ID changes.
-    "run_batch": "runBatch.log",
-    # RDS Status.
-    "rds_status": "check_rds_status.log",
-    # EC2 Instance Health.
-    "ec2_status": "check_ec2_status.log",
+    # World-Check Import (norkom.log) and RunBatch Activity (runBatch.log) - current batch instance.
+    "norkom": "batch/i-076c46db2a038991c/batch/norkom.log",
+    "run_batch": "batch/i-076c46db2a038991c/batch/runBatch.log",
 }
 
 # How far back each Logs Insights query should look.
@@ -54,8 +44,9 @@ DB_NAME = os.environ.get("MGL_DB_NAME")
 DB_USER = os.environ.get("MGL_DB_USER")
 DB_PASSWORD = os.environ.get("MGL_DB_PASSWORD")
 
-# Substring match (case-insensitive) used by the ASG/EFS Infra Checks to find production resources.
-INFRA_NAME_FILTER = "production"
+# Substrings (case-insensitive, ALL must be present) used by the EC2/RDS/ASG/EFS Infra Checks
+# to find MGL's production resources - e.g. "mgl-production-compute...".
+INFRA_NAME_FILTER = ("mgl", "production")
 
 # Each entry wires a check's independent function (lib/checks.py) into the report.
 # category groups rows into report sections - every client standardizes on exactly two:
@@ -67,17 +58,13 @@ INFRA_NAME_FILTER = "production"
 # All must return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
 CHECKS = [
     {"name": "UI Availability", "category": "Infra Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
-    {"name": "EC2 Instance Health", "category": "Infra Checks", "func": "check_ec2_status", "log_group": "application", "lookback_minutes": 180},
-    {"name": "RDS Status", "category": "Infra Checks", "func": "check_rds_status", "log_group": "application", "lookback_minutes": 180},
+    {"name": "EC2 Instances", "category": "Infra Checks", "func": "check_ec2_health", "kind": "aws_session"},
+    {"name": "RDS", "category": "Infra Checks", "func": "check_rds_health", "kind": "aws_session"},
     {"name": "RDS Pending Maintenance", "category": "Infra Checks", "func": "check_rds_maintenance", "kind": "aws_session"},
     {"name": "ASG Health", "category": "Infra Checks", "func": "check_asg_health", "kind": "aws_session"},
     {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
-    {"name": "WorldCheck Download", "category": "Application", "func": "check_worldcheck_download", "log_group": "application"},
-    {"name": "Index Rebuild Status", "category": "Application", "func": "check_index_rebuild", "log_group": "application"},
-    {"name": "Envelope Processing", "category": "Application", "func": "check_envelope_processing", "log_group": "application"},
-    {"name": "Batch Status", "category": "Application", "func": "check_batch_status", "log_group": "application"},
-    {"name": "Acquisition Status", "category": "Application", "func": "check_acquisition_status", "log_group": "application"},
-    {"name": "WLM Status", "category": "Application", "func": "check_wlm_status", "log_group": "application", "lookback_minutes": 720},
+    {"name": "World-Check Import", "category": "Application", "func": "check_worldcheck_import", "log_group": "application"},
+    {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application"},
     # Database Validation is disabled until real MGL_DB_* connection details are provided -
     # re-add {"name": "Database Validation", "category": "Application", "func": "check_database_validation",
     # "kind": "standalone"} once they're configured (lib/db_check.py is still ready to use).

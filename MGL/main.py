@@ -2,11 +2,10 @@
 MGL AWS Daily Health Check.
 
 Runs a set of independent checks - most via CloudWatch Logs Insights against specific
-log streams (UI Availability, WorldCheck Download, Index Rebuild Status, Envelope
-Processing, Batch/Acquisition/WLM Status), plus RDS Pending Maintenance (direct RDS API
-call) and Database Validation (direct SQL query, no AWS API involved) - prints a console
-health report, and renders the same standard client HTML report used by the other
-client folders.
+log streams (UI Availability, World-Check Import, RunBatch Activity), plus RDS Pending
+Maintenance (direct RDS API call) and Database Validation (direct SQL query, no AWS API
+involved) - prints a console health report, and renders the same standard client HTML
+report used by the other client folders.
 
 Each check is an independent function in lib/checks.py (or lib/db_check.py for Database
 Validation) returning a Healthy/Warning/Failed status plus a detail string. Add new
