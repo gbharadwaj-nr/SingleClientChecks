@@ -22,7 +22,7 @@ from bootstrap import bootstrap, list_all_regions
 from lib.checks import CHECK_FUNCTIONS
 from lib.html_report import render_report
 from lib.logs_insights import extract_messages, extract_stats, find_log_group_region, run_query
-from lib.teams_notification import send_teams_notification
+from lib.teams_notification import send_batch_failure_alert, send_teams_notification
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +213,13 @@ def main() -> None:
         account_id=aws_ctx.account_id,
         generated_at=generated_at,
         overall_status=compute_overall_status(results),
+        sections=sections,
+    )
+
+    send_batch_failure_alert(
+        client_name=config.CLIENT_NAME,
+        account_id=aws_ctx.account_id,
+        generated_at=generated_at,
         sections=sections,
     )
 

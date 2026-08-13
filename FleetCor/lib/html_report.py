@@ -28,6 +28,13 @@ def render_report(client_name: str, client_logo: str, account_id: str,
             summary["passed" if status == "ok" else "warning" if status == "warning" else "failed"] += 1
     overall_status = "UNHEALTHY" if summary["failed"] else "HEALTHY"
 
+    # Rows needing attention in the Application section, surfaced as a banner (mirrors the
+    # separate Teams batch-failure alert in lib/teams_notification.py).
+    batch_alert_rows = [
+        row for section in sections if section["title"] == "Application"
+        for row in section["rows"] if row.get("status") != "ok"
+    ]
+
     html = template.render(
         client_name=client_name,
         client_logo=client_logo,
@@ -36,6 +43,7 @@ def render_report(client_name: str, client_logo: str, account_id: str,
         sections=sections,
         summary=summary,
         overall_status=overall_status,
+        batch_alert_rows=batch_alert_rows,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

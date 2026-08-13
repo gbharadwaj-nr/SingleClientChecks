@@ -72,21 +72,6 @@ CHECKS = [
         "failure_label": "Unavailable",
     },
     {
-        # Maps to the "AML Batch Monitoring" dashboard widget.
-        "name": "AML Batch",
-        "category": "Infra Checks",
-        "log_group": LOG_GROUPS["application"],
-        "query": (
-            "fields @message\n"
-            "| filter @logStream like /aml_batch_monitoring.log/\n"
-            "| sort @timestamp desc\n"
-            "| limit 5"
-        ),
-        "lookback_minutes": 180,  # matches START=-10800s (3 hours) in the original console query
-        "success_label": "Completed",
-        "failure_label": "Failed",
-    },
-    {
         # Direct AWS API check (autoscaling:DescribeAutoScalingGroups), not a log query.
         "name": "ASG Health",
         "category": "Infra Checks",

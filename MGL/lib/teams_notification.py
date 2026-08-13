@@ -49,3 +49,48 @@ def send_teams_notification(client_name: str, account_id: str, generated_at: str
         logger.info("Teams notification sent successfully")
     except Exception:
         logger.exception("Failed to send Teams notification")
+
+
+def send_batch_failure_alert(client_name: str, account_id: str, generated_at: str, sections: list[dict]) -> None:
+    """Post a separate, clearly-flagged Teams alert only when the Application section has failures.
+
+    Distinct from send_teams_notification()'s daily executive summary - this fires only when
+    there's something actionable (a batch/application check in Warning or Failed state).
+    """
+    failing_rows = [
+        row for section in sections if section["title"] == "Application"
+        for row in section["rows"] if row.get("status") != "ok"
+    ]
+    if not failing_rows:
+        return
+
+    webhook = os.getenv("TEAMS_WEBHOOK")
+    if not webhook:
+        logger.warning("TEAMS_WEBHOOK not set; skipping batch failure alert")
+        return
+
+    message = {
+        "@type": "MessageCard",
+        "@context": "https://schema.org/extensions",
+        "themeColor": "D13B3B",
+        "summary": f"{client_name} Batch Failure Alert",
+        "title": f"\U0001F6A8 {client_name} - Batch/Application Failure Alert",
+        "sections": [
+            {
+                "activityTitle": f"{len(failing_rows)} Application check(s) need attention",
+                "activitySubtitle": f"Account {account_id} | Generated {generated_at}",
+                "facts": [{"name": row["cells"][0], "value": row["cells"][1]} for row in failing_rows],
+            },
+        ],
+    }
+
+    try:
+        request = urllib.request.Request(
+            webhook,
+            data=json.dumps(message).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(request)
+        logger.info("Batch failure alert sent successfully")
+    except Exception:
+        logger.exception("Failed to send batch failure alert")
