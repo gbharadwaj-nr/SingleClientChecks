@@ -127,6 +127,7 @@ main {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     padding: 18px 20px;
     page-break-inside: avoid;
+    border-top: 3px solid var(--brand-blue);
 }
 
 .report-section h2 {
@@ -148,6 +149,7 @@ main {
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--muted);
+    background: #f5f7fc;
     border-bottom: 2px solid #e1e4e8;
 }
 

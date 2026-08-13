@@ -87,8 +87,9 @@ def evaluate_check(check: dict, session, all_regions: list[str], region_cache: d
     if check.get("check_type") == "aws_api":
         func = CHECK_FUNCTIONS[check["func"]]
         status_label, passed, detail = func(session, all_regions, check.get("name_filter", ""))
+        # Per-resource breakdown goes only into the evidence panel, keeping the badge to a plain status word.
         evidence = detail.split("; ") if detail else None
-        return status_label, passed, detail, evidence
+        return status_label, passed, None, evidence
 
     if not check["query"] or not check["log_group"]:
         return "Not Configured", None, None, None
