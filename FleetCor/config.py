@@ -46,30 +46,20 @@ CHECKS = [
         "failure_label": "Unavailable",
     },
     {
+        # Direct AWS API check (ec2:DescribeInstances/DescribeInstanceStatus + cloudwatch:GetMetricStatistics).
         "name": "EC2 Instances",
         "category": "Infra Checks",
-        "log_group": LOG_GROUPS["application"],
-        "query": (
-            "fields @message\n"
-            "| filter @logStream like /check_ec2_status.log/\n"
-            "| sort @timestamp desc\n"
-            "| limit 3"
-        ),
-        "success_label": "Available",
-        "failure_label": "Unavailable",
+        "check_type": "aws_api",
+        "func": "check_ec2_health",
+        "name_filter": "production",
     },
     {
+        # Direct AWS API check (rds:DescribeDBInstances + cloudwatch:GetMetricStatistics).
         "name": "RDS",
         "category": "Infra Checks",
-        "log_group": LOG_GROUPS["application"],
-        "query": (
-            "fields @message\n"
-            "| filter @logStream like /check_rds_status.log/\n"
-            "| sort @timestamp desc\n"
-            "| limit 2"
-        ),
-        "success_label": "Available",
-        "failure_label": "Unavailable",
+        "check_type": "aws_api",
+        "func": "check_rds_health",
+        "name_filter": "production",
     },
     {
         # Direct AWS API check (autoscaling:DescribeAutoScalingGroups), not a log query.
