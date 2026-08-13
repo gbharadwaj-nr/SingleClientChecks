@@ -33,25 +33,6 @@
     </div>
     {% endif %}
 
-    <div class="summary-bar">
-        <div class="summary-card summary-card--total">
-            <span class="summary-card__value">{{ summary.total }}</span>
-            <span class="summary-card__label">Total Checks</span>
-        </div>
-        <div class="summary-card summary-card--ok">
-            <span class="summary-card__value">{{ summary.passed }}</span>
-            <span class="summary-card__label">Passing</span>
-        </div>
-        <div class="summary-card summary-card--warning">
-            <span class="summary-card__value">{{ summary.warning }}</span>
-            <span class="summary-card__label">Not Configured</span>
-        </div>
-        <div class="summary-card summary-card--error">
-            <span class="summary-card__value">{{ summary.failed }}</span>
-            <span class="summary-card__label">Failing</span>
-        </div>
-    </div>
-
     <main>
         {% for section in sections %}
         <section class="report-section">

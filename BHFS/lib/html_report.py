@@ -41,7 +41,6 @@ def render_report(client_name: str, client_logo: str, account_id: str,
         account_id=account_id,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         sections=sections,
-        summary=summary,
         overall_status=overall_status,
         batch_alert_rows=batch_alert_rows,
     )

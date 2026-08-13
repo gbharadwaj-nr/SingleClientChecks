@@ -19,9 +19,10 @@
 }
 
 body {
-    font-family: "Segoe UI", Arial, sans-serif;
+    font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
     padding: 0;
+    line-height: 1.5;
     background-color: var(--bg);
     color: var(--text);
 }
@@ -89,19 +90,12 @@ body {
     border: 1px solid rgba(209, 59, 59, 0.8);
 }
 
-.summary-bar {
-    display: flex;
-    gap: 16px;
-    padding: 20px 28px 0;
-    flex-wrap: wrap;
-}
-
 .batch-alert-banner {
     margin: 20px 28px 0;
     background: var(--error-bg);
     border: 1px solid var(--error);
-    border-left: 5px solid var(--error);
-    border-radius: 8px;
+    border-left: 6px solid var(--error);
+    border-radius: 10px;
     padding: 14px 20px;
     color: var(--error);
 }
@@ -122,42 +116,6 @@ body {
     margin-bottom: 2px;
 }
 
-.summary-card {
-    flex: 1;
-    min-width: 140px;
-    background: var(--card-bg);
-    border-radius: 10px;
-    padding: 16px 20px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    display: flex;
-    flex-direction: column;
-    border-top: 4px solid var(--brand-blue);
-}
-
-.summary-card__value {
-    font-size: 1.8rem;
-    font-weight: 700;
-}
-
-.summary-card__label {
-    font-size: 0.8rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.summary-card--ok {
-    border-top-color: var(--ok);
-}
-
-.summary-card--warning {
-    border-top-color: var(--warning);
-}
-
-.summary-card--error {
-    border-top-color: var(--error);
-}
-
 main {
     padding: 24px 28px 8px;
 }
@@ -174,6 +132,7 @@ main {
 .report-section h2 {
     margin: 0 0 12px;
     font-size: 1.05rem;
+    font-weight: 700;
     color: var(--brand-purple);
 }
 
@@ -313,10 +272,6 @@ tr.status-error td:first-child {
     .report-header {
         flex-direction: column;
         align-items: flex-start;
-    }
-
-    .summary-bar {
-        padding: 20px 16px 0;
     }
 
     main {
