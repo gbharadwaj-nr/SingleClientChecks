@@ -1,6 +1,7 @@
 """Renders the shared HTML report template using Jinja2."""
 
 import logging
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -47,4 +48,10 @@ def render_report(client_name: str, client_logo: str, account_id: str,
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html, encoding="utf-8")
+
+    # report_template.html links to these as relative paths ('styles.css', 'logos/...'), so they
+    # must physically sit next to report.html - otherwise they 404 and the report renders unstyled.
+    shutil.copy2(ASSETS_DIR / "styles.css", output_path.parent / "styles.css")
+    shutil.copytree(ASSETS_DIR / "logos", output_path.parent / "logos", dirs_exist_ok=True)
+
     logger.info("Rendered report to %s", output_path)
