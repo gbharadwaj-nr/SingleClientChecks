@@ -150,4 +150,55 @@ CHECKS = [
         "success_label": "Sent",
         "failure_label": "Not Sent",
     },
+    {
+        # Maps to the "runBatch.log" batch instance log stream (acq_success flag creation).
+        "name": "ACQ Success Flag",
+        "category": "Batch Processing",
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /runBatch.log/\n"
+            "| filter @message like /acq_success/\n"
+            "| sort @timestamp desc\n"
+            "| limit 5"
+        ),
+        "detail_regex": r"(?i)(acq_success_\S+?\.flag)",  # flag file name, e.g. acq_success_20260812.flag
+        "detail_target": "status",  # shown as "Created (acq_success_20260812.flag)"
+        "success_label": "Created",
+        "failure_label": "Not Created",
+    },
+    {
+        # Maps to the "runBatch.log" batch instance log stream (aml_success flag creation).
+        "name": "AML Success Flag",
+        "category": "Batch Processing",
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /runBatch.log/\n"
+            "| filter @message like /aml_success/\n"
+            "| sort @timestamp desc\n"
+            "| limit 5"
+        ),
+        "detail_regex": r"(?i)(aml_success_\S+?\.flag)",  # flag file name, e.g. aml_success_20260812.flag
+        "detail_target": "status",  # shown as "Created (aml_success_20260812.flag)"
+        "success_label": "Created",
+        "failure_label": "Not Created",
+    },
+    {
+        # Maps to the "runBatch.log" batch instance log stream (NetReveal BAD file copy/flag creation).
+        "name": "Bad Records Flag",
+        "category": "Batch Processing",
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /runBatch.log/\n"
+            "| filter @message like /BAD/\n"
+            "| sort @timestamp desc\n"
+            "| limit 5"
+        ),
+        "detail_regex": r"(NetReveal_BAD_\S+?\.ZIP)",  # bad-file name, e.g. NetReveal_BAD_20260812.ZIP
+        "detail_target": "status",  # shown as "Created (NetReveal_BAD_20260812.ZIP)"
+        "success_label": "Created",
+        "failure_label": "Not Created",
+    },
 ]
