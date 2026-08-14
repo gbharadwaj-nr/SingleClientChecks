@@ -119,7 +119,12 @@ def check_runbatch_activity(logs_client, log_group: str, lookback_minutes: int) 
 
 
 def check_rds_maintenance(session, all_regions: list[str], lookback_minutes: int) -> dict:
-    """RDS DescribePendingMaintenanceActions (read-only) across every enabled region."""
+    """RDS DescribePendingMaintenanceActions (read-only) across every enabled region.
+
+    account 616476889381 is shared with other clients (see config.py note), so results are
+    restricted to resources matching config.INFRA_NAME_FILTER just like check_rds_health.
+    """
+    name_filter = config.INFRA_NAME_FILTER
     pending = []
     for region in all_regions:
         rds = session.client("rds", region_name=region)
@@ -128,6 +133,8 @@ def check_rds_maintenance(session, all_regions: list[str], lookback_minutes: int
             for page in paginator.paginate():
                 for item in page.get("PendingMaintenanceActions", []):
                     resource_id = item.get("ResourceIdentifier", "unknown")
+                    if not _name_matches(resource_id, name_filter):
+                        continue
                     for action in item.get("PendingMaintenanceActionDetails", []):
                         pending.append(f"{resource_id} ({region}): {action.get('Action', 'unknown')} - notify stakeholders and schedule a maintenance window")
         except Exception:
