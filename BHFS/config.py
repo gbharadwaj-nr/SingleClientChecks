@@ -44,7 +44,8 @@ CHECKS = [
     {"name": "RDS Pending Maintenance", "category": "Infra Checks", "func": "check_rds_maintenance", "kind": "aws_session"},
     {"name": "ASG Health", "category": "Infra Checks", "func": "check_asg_health", "kind": "aws_session"},
     {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
-    {"name": "Factiva Import", "category": "Application", "func": "check_factiva_import", "log_group": "application"},
-    {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application"},
+    # 2-day lookback (vs the default 24h) so weekend/off-day gaps in batch activity don't get flagged.
+    {"name": "Factiva Import", "category": "Application", "func": "check_factiva_import", "log_group": "application", "lookback_minutes": 2880},
+    {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application", "lookback_minutes": 2880},
 ]
 
