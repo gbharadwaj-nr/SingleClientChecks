@@ -29,8 +29,9 @@ LOG_STREAMS = {
 QUERY_LOOKBACK_MINUTES = 1440  # 24 hours
 
 # Substrings (case-insensitive, ALL must be present) used by the EC2/RDS/ASG/EFS Infra Checks
-# to find LFS's production resources - e.g. "lfs-production-compute...".
-INFRA_NAME_FILTER = ("lfs", "production")
+# to find LFS's production resources - real naming is "lfs-prod-..." (e.g. RDS identifier
+# lfs-prod-databaseresources-vlh1arko2g5c-eimdb-auieceah6ke5), not "lfs-production-...".
+INFRA_NAME_FILTER = ("lfs", "prod")
 
 # Each entry wires a check's independent function (lib/checks.py) into the report.
 # category groups rows into report sections - every client standardizes on exactly two:
