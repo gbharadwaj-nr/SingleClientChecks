@@ -7,6 +7,7 @@ functions share `_run_stream()` (single-stream query + field extraction).
 """
 
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 import config
@@ -94,6 +95,42 @@ def check_runbatch_activity(logs_client, log_group: str, lookback_minutes: int) 
     plural = "y" if len(rows) == 1 else "ies"
     detail = f"{len(rows)} file/flag creation entr{plural} found"
     return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
+
+
+def check_acq_success_flag(logs_client, log_group: str, lookback_minutes: int) -> dict:
+    """runBatch.log: verify the acq_success flag file was created."""
+    rows = _run_stream(
+        logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
+        limit=5, message_filter="@message like /acq_success/",
+    )
+    if not rows:
+        return {"status": FAILED, "detail": "No 'acq_success' flag activity found in runBatch.log"}
+
+    messages = [row.get("@message", "") for row in rows]
+    has_failure = any(keyword in m.lower() for m in messages for keyword in _FAILURE_KEYWORDS)
+    latest = messages[0]
+    match = re.search(r"(?i)(acq_success\S*\.flag)", latest)
+    flag_name = match.group(1) if match else latest[:150]
+    detail = f"Not Created - latest: {latest[:200]}" if has_failure else f"Created ({flag_name})"
+    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows)}
+
+
+def check_bad_records(logs_client, log_group: str, lookback_minutes: int) -> dict:
+    """runBatch.log: search for 'BAD'-flagged entries (e.g. NetReveal_BAD zip)."""
+    rows = _run_stream(
+        logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
+        limit=10, message_filter="@message like /BAD/",
+    )
+    if not rows:
+        return {"status": HEALTHY, "detail": "No 'BAD' entries found in runBatch.log"}
+
+    messages = [row.get("@message", "") for row in rows]
+    latest = messages[0]
+    match = re.search(r"(NetReveal_BAD\S*\.ZIP)", latest, re.IGNORECASE)
+    filename = match.group(1) if match else latest[:150]
+    plural = "y" if len(rows) == 1 else "ies"
+    detail = f"{len(rows)} 'BAD' entr{plural} found - latest: {filename}"
+    return {"status": WARNING, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
 
 
 def check_rds_maintenance(session, all_regions: list[str], lookback_minutes: int) -> dict:
@@ -335,6 +372,8 @@ def check_rds_health(session, all_regions: list[str], lookback_minutes: int) -> 
 CHECK_FUNCTIONS = {
     "check_factiva_import": check_factiva_import,
     "check_runbatch_activity": check_runbatch_activity,
+    "check_acq_success_flag": check_acq_success_flag,
+    "check_bad_records": check_bad_records,
     "check_rds_maintenance": check_rds_maintenance,
     "check_asg_health": check_asg_health,
     "check_efs_health": check_efs_health,

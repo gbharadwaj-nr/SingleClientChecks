@@ -65,6 +65,8 @@ CHECKS = [
     {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
     {"name": "World-Check Import", "category": "Application", "func": "check_worldcheck_import", "log_group": "application"},
     {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application"},
+    {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application"},
+    {"name": "Bad Records", "category": "Application", "func": "check_bad_records", "log_group": "application"},
     # Database Validation is disabled until real MGL_DB_* connection details are provided -
     # re-add {"name": "Database Validation", "category": "Application", "func": "check_database_validation",
     # "kind": "standalone"} once they're configured (lib/db_check.py is still ready to use).

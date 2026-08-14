@@ -47,5 +47,7 @@ CHECKS = [
     # 2-day lookback (vs the default 24h) so weekend/off-day gaps in batch activity don't get flagged.
     {"name": "Factiva Import", "category": "Application", "func": "check_factiva_import", "log_group": "application", "lookback_minutes": 2880},
     {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application", "lookback_minutes": 2880},
+    {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application", "lookback_minutes": 2880},
+    {"name": "Bad Records", "category": "Application", "func": "check_bad_records", "log_group": "application", "lookback_minutes": 2880},
 ]
 

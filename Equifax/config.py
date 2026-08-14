@@ -21,6 +21,10 @@ LOG_GROUPS = {
 # Specific log streams used by the per-stream checks in lib/checks.py.
 LOG_STREAMS = {
     "application_batch": "batch/i-092d6ad85ff0aa5cc/batch/application.log",
+    # Not directly confirmed for Equifax - inferred from the same batch instance ID that
+    # runs application.log, following the convention seen in every other client (same
+    # instance emits both application.log and runBatch.log). Verify before relying on it.
+    "run_batch": "batch/i-092d6ad85ff0aa5cc/batch/runBatch.log",
 }
 
 # How far back each Logs Insights query should look.
@@ -44,4 +48,6 @@ CHECKS = [
     {"name": "ASG Health", "category": "Infra Checks", "func": "check_asg_health", "kind": "aws_session"},
     {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
     {"name": "Factiva Import", "category": "Application", "func": "check_factiva_import", "log_group": "application"},
+    {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application"},
+    {"name": "Bad Records", "category": "Application", "func": "check_bad_records", "log_group": "application"},
 ]

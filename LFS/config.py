@@ -53,4 +53,6 @@ CHECKS = [
     # runBatch.log activity don't get flagged.
     {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application", "lookback_minutes": 2880},
     {"name": "ETL", "category": "Application", "func": "check_etl", "log_group": "application"},
+    {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application", "lookback_minutes": 2880},
+    {"name": "Bad Records", "category": "Application", "func": "check_bad_records", "log_group": "application", "lookback_minutes": 2880},
 ]
