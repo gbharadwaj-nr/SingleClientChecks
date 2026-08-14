@@ -1,18 +1,14 @@
 """
 BHFS AWS Daily Health Check.
 
-Runs a set of independent CloudWatch Logs Insights checks - one per log stream
-(check_ec2_status.log, check_rds_status.log, application.log,
-aml/wlm/cdd_batch_monitoring.log, check_acq_success.log, check_bad_files.log) plus the
-UI Availability check (separate Lambda log group), a multi-log-group Factiva Import
-check (ApplicationLogs + SystemLogs + CloudFormationLogs), and a couple of
-message-pattern checks (Envelope Processing, Transaction File, Real-Time Processing,
-Real-Time API Latency) - prints a console health report, and renders the same standard
-client HTML report used by the other client folders.
+Runs a set of independent checks - EC2/RDS/ASG/EFS (direct AWS API calls) plus Factiva
+Import and RunBatch Activity (CloudWatch Logs Insights against specific log streams) -
+prints a console health report, and renders the same standard client HTML report used by
+the other client folders.
 
-Each check is an independent function in lib/checks.py returning a Healthy/Warning/
-Failed status plus a detail string. Add new checks by adding a function there and an
-entry to config.CHECKS - no other code changes are required.
+Each check is an independent function in lib/checks.py returning a Healthy/Warning/Failed
+status plus a detail string. Add new checks by adding a function there and an entry to
+config.CHECKS - no other code changes are required.
 """
 
 import logging
@@ -52,28 +48,24 @@ def run_checks(session, all_regions: list[str]) -> list[dict]:
     results = []
     for check in config.CHECKS:
         func = CHECK_FUNCTIONS[check["func"]]
+        kind = check.get("kind", "logs")
         lookback_minutes = check.get("lookback_minutes", config.QUERY_LOOKBACK_MINUTES)
 
         try:
-            if check.get("kind") == "aws_session":
+            if kind == "aws_session":
                 outcome = func(session, all_regions, lookback_minutes)
             else:
-                if "log_groups" in check:
-                    # Multi-log-group check (e.g. Factiva Import): all groups must share one region.
-                    target = [config.LOG_GROUPS[key] for key in check["log_groups"]]
-                    logs_client = _get_logs_client(session, target[0], all_regions, region_cache)
-                else:
-                    target = config.LOG_GROUPS[check.get("log_group", "application")]
-                    logs_client = _get_logs_client(session, target, all_regions, region_cache)
-
+                log_group = config.LOG_GROUPS[check.get("log_group", "application")]
+                logs_client = _get_logs_client(session, log_group, all_regions, region_cache)
                 if logs_client is None:
-                    outcome = {"status": "Failed", "detail": f"Log group(s) {target} not found in any region"}
+                    outcome = {"status": "Failed", "detail": f"Log group {log_group} not found in any region"}
                 else:
-                    outcome = func(logs_client, target, lookback_minutes)
+                    outcome = func(logs_client, log_group, lookback_minutes)
             status, detail, evidence = outcome["status"], outcome["detail"], outcome.get("evidence")
         except Exception:
             logger.exception("Check %s raised an unexpected error", check["name"])
             status, detail, evidence = "Failed", "Unexpected error while running this check", None
+
         results.append({**check, "status": status, "detail": detail, "evidence": evidence})
     return results
 

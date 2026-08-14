@@ -80,6 +80,22 @@ def check_factiva_import(logs_client, log_group: str, lookback_minutes: int) -> 
     return {"status": status, "detail": detail, "evidence": _evidence_lines(rows)}
 
 
+def check_etl(logs_client, log_group: str, lookback_minutes: int) -> dict:
+    """getDXVLandingFiles.log: ETL completion activity."""
+    rows = _run_stream(
+        logs_client, log_group, config.LOG_STREAMS["get_dxv_landing_files"], lookback_minutes,
+        limit=20, message_filter="@message like /ETL completed successfully/",
+    )
+    if not rows:
+        return {"status": FAILED, "detail": "No 'ETL completed successfully' activity found in getDXVLandingFiles.log"}
+
+    messages = [row.get("@message", "") for row in rows]
+    has_failure = any(keyword in m.lower() for m in messages for keyword in _FAILURE_KEYWORDS)
+    plural = "y" if len(rows) == 1 else "ies"
+    detail = f"{len(rows)} ETL completion entr{plural} - latest: {messages[0][:200]}"
+    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows)}
+
+
 def check_runbatch_activity(logs_client, log_group: str, lookback_minutes: int) -> dict:
     """runBatch.log: batch file/flag creation activity - lists every matching log line."""
     rows = _run_stream(
@@ -342,6 +358,7 @@ def check_rds_health(session, all_regions: list[str], lookback_minutes: int) -> 
 CHECK_FUNCTIONS = {
     "check_factiva_import": check_factiva_import,
     "check_runbatch_activity": check_runbatch_activity,
+    "check_etl": check_etl,
     "check_rds_maintenance": check_rds_maintenance,
     "check_asg_health": check_asg_health,
     "check_efs_health": check_efs_health,
