@@ -63,19 +63,24 @@ def _name_matches(name: str, filters) -> bool:
 
 
 def check_pipeline(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """initiatePipeline.log: confirm the pipeline completed successfully."""
+    """initiatePipeline.log: confirm each pipeline stage completed successfully.
+
+    Real log lines are "Pipeline <task_name> completed successfully." (e.g. "Pipeline
+    data_loading completed successfully."), not the literal phrase "Pipeline completed" -
+    match on both substrings separately instead of the exact phrase.
+    """
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["initiate_pipeline"], lookback_minutes,
-        limit=20, message_filter="@message like /Pipeline completed/",
+        limit=50, message_filter="@message like /Pipeline/ and @message like /completed successfully/",
     )
     if not rows:
-        return {"status": FAILED, "detail": "No 'Pipeline completed' activity found in initiatePipeline.log"}
+        return {"status": FAILED, "detail": "No pipeline completion activity found in initiatePipeline.log"}
 
     messages = [row.get("@message", "") for row in rows]
     has_failure = any(keyword in m.lower() for m in messages for keyword in _FAILURE_KEYWORDS)
     plural = "y" if len(rows) == 1 else "ies"
     detail = f"{len(rows)} pipeline completion entr{plural} - latest: {messages[0][:200]}"
-    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows)}
+    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
 
 
 def check_rds_maintenance(session, all_regions: list[str], lookback_minutes: int) -> dict:
