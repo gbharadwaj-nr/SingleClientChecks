@@ -69,25 +69,27 @@ body {
     color: rgba(255, 255, 255, 0.85);
 }
 
-.status-banner {
-    padding: 8px 18px;
-    border-radius: 999px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    font-size: 0.9rem;
+.report-header__powered {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 8px;
+    padding: 6px 12px;
+}
+
+.report-header__powered-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
     white-space: nowrap;
 }
 
-.status-banner--healthy {
-    background-color: rgba(26, 158, 106, 0.2);
-    color: #d7f5e7;
-    border: 1px solid rgba(26, 158, 106, 0.7);
-}
-
-.status-banner--unhealthy {
-    background-color: rgba(209, 59, 59, 0.25);
-    color: #ffd9d9;
-    border: 1px solid rgba(209, 59, 59, 0.8);
+.report-header__powered-logo {
+    height: 22px;
+    display: block;
 }
 
 .batch-alert-banner {
