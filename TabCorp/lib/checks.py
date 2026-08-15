@@ -116,7 +116,7 @@ def check_acq_success_flag(logs_client, log_group: str, lookback_minutes: int) -
 
 
 def check_bad_records(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """runBatch.log: search for 'BAD'-flagged entries (e.g. NetReveal_BAD zip)."""
+    """runBatch.log: search for 'BAD'-flagged entries (e.g. NetReveal_BAD zip) - routine daily archiving, not a failure signal by itself."""
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
         limit=10, message_filter="@message like /BAD/",
@@ -125,12 +125,13 @@ def check_bad_records(logs_client, log_group: str, lookback_minutes: int) -> dic
         return {"status": HEALTHY, "detail": "No 'BAD' entries found in runBatch.log"}
 
     messages = [row.get("@message", "") for row in rows]
+    has_failure = any(keyword in m.lower() for m in messages for keyword in _FAILURE_KEYWORDS)
     latest = messages[0]
     match = re.search(r"(NetReveal_BAD\S*\.ZIP)", latest, re.IGNORECASE)
     filename = match.group(1) if match else latest[:150]
     plural = "y" if len(rows) == 1 else "ies"
     detail = f"{len(rows)} 'BAD' entr{plural} found - latest: {filename}"
-    return {"status": WARNING, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
+    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
 
 
 def check_rds_maintenance(session, all_regions: list[str], lookback_minutes: int) -> dict:
