@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'Suncorp/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'Suncorp/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'Suncorp/output',
                     reportFiles: 'report.html',

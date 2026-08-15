@@ -71,7 +71,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'MGL/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'MGL/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'MGL/output',
                     reportFiles: 'report.html',

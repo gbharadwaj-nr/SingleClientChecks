@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'TabCorp/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'TabCorp/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'TabCorp/output',
                     reportFiles: 'report.html',

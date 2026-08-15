@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'BHFS/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'BHFS/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'BHFS/output',
                     reportFiles: 'report.html',

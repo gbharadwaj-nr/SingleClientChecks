@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'BoQ/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'BoQ/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'BoQ/output',
                     reportFiles: 'report.html',

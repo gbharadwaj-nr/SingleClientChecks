@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'FleetCor/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'FleetCor/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'FleetCor/output',
                     reportFiles: 'report.html',

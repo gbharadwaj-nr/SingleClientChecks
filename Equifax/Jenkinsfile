@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'Equifax/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'Equifax/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'Equifax/output',
                     reportFiles: 'report.html',

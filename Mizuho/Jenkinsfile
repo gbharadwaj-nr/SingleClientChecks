@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'Mizuho/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'Mizuho/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'Mizuho/output',
                     reportFiles: 'report.html',

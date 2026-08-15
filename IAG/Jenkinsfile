@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'IAG/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'IAG/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'IAG/output',
                     reportFiles: 'report.html',

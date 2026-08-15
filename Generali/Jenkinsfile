@@ -68,7 +68,7 @@ pipeline {
 
         stage('Publish report') {
             steps {
-                archiveArtifacts artifacts: 'Generali/output/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'Generali/output/**', fingerprint: true
                 publishHTML(target: [
                     reportDir: 'Generali/output',
                     reportFiles: 'report.html',
