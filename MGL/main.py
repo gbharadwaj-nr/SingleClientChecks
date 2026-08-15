@@ -117,6 +117,7 @@ def build_sections(results: list[dict]) -> list[dict]:
             rows.append({
                 "status": _ROW_STATUS[result["status"]],
                 "cells": [result["name"], result["status"]],
+                "detail": result.get("detail"),
                 "evidence": evidence,
             })
         sections.append({"title": category, "columns": [category, "Status"], "rows": rows})
