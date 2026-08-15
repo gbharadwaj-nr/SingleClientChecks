@@ -19,6 +19,15 @@ def _fact_value(row: dict) -> str:
     return status
 
 
+def _section_facts(section: dict) -> list[dict]:
+    """Application keeps full per-check detail; other sections (e.g. Infra Checks) collapse to one healthy/not-healthy line."""
+    if section["title"] == "Application":
+        return [{"name": row["cells"][0], "value": _fact_value(row)} for row in section["rows"]]
+    unhealthy = [row["cells"][0] for row in section["rows"] if row.get("status") != "ok"]
+    value = "Healthy" if not unhealthy else f"Not Healthy \u2014 {', '.join(unhealthy)}"
+    return [{"name": section["title"], "value": value}]
+
+
 def send_teams_notification(client_name: str, account_id: str, generated_at: str,
                              overall_status: str, sections: list[dict]) -> None:
     """Post an executive summary MessageCard to the Teams channel via the TEAMS_WEBHOOK env var."""
@@ -37,7 +46,7 @@ def send_teams_notification(client_name: str, account_id: str, generated_at: str
         "sections": [
             {
                 "activityTitle": section["title"],
-                "facts": [{"name": row["cells"][0], "value": _fact_value(row)} for row in section["rows"]],
+                "facts": _section_facts(section),
             }
             for section in sections
         ],
