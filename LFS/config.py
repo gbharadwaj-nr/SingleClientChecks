@@ -20,11 +20,12 @@ LOG_GROUPS = {
 
 # Specific log streams used by the per-stream checks in lib/checks.py.
 LOG_STREAMS = {
-    # Factiva Import (norkom.log), RunBatch Activity (runBatch.log) and ETL
-    # (getDXVLandingFiles.log), all on the same batch instance.
-    "norkom": "batch/i-06c3ccf7f1199386d/batch/norkom.log",
-    "run_batch": "batch/i-06c3ccf7f1199386d/batch/runBatch.log",
-    "get_dxv_landing_files": "batch/i-06c3ccf7f1199386d/batch/getDXVLandingFiles.log",
+    # Bare filenames, NOT full instance paths - the batch EC2 instance gets replaced/
+    # autoscaled over time, and _run_stream()'s `@logStream like "text"` substring match
+    # keeps matching any instance's stream as long as the filename itself is right.
+    "norkom": "norkom.log",
+    "run_batch": "runBatch.log",
+    "get_dxv_landing_files": "getDXVLandingFiles.log",
 }
 
 # How far back each Logs Insights query should look.

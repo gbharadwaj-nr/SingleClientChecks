@@ -23,9 +23,11 @@ LOG_GROUPS = {
 
 # Specific log streams used by the per-stream checks in lib/checks.py.
 LOG_STREAMS = {
-    # World-Check Import (application.log) and RunBatch Activity (runBatch.log), same batch instance.
-    "application_batch": "batch/i-00f185c8c7196a8f3/batch/application.log",
-    "run_batch": "batch/i-00f185c8c7196a8f3/batch/runBatch.log",
+    # Bare filenames, NOT full instance paths - the batch EC2 instance gets replaced/
+    # autoscaled over time, and _run_stream()'s `@logStream like "text"` substring match
+    # keeps matching any instance's stream as long as the filename itself is right.
+    "application_batch": "application.log",
+    "run_batch": "runBatch.log",
 }
 
 # How far back each Logs Insights query should look.

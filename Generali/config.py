@@ -20,7 +20,10 @@ LOG_GROUPS = {
 
 # Specific log streams used by the per-stream checks in lib/checks.py.
 LOG_STREAMS = {
-    "run_batch": "batch/i-0be4f68baef0fce4c/batch/runBatch.log",
+    # Bare filename, NOT a full instance path - the batch EC2 instance gets replaced/
+    # autoscaled over time, and _run_stream()'s `@logStream like "text"` substring match
+    # keeps matching any instance's stream as long as the filename itself is right.
+    "run_batch": "runBatch.log",
 }
 
 # How far back each Logs Insights query should look.

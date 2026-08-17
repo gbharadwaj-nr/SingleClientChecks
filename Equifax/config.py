@@ -20,11 +20,11 @@ LOG_GROUPS = {
 
 # Specific log streams used by the per-stream checks in lib/checks.py.
 LOG_STREAMS = {
-    "application_batch": "batch/i-092d6ad85ff0aa5cc/batch/application.log",
-    # Not directly confirmed for Equifax - inferred from the same batch instance ID that
-    # runs application.log, following the convention seen in every other client (same
-    # instance emits both application.log and runBatch.log). Verify before relying on it.
-    "run_batch": "batch/i-092d6ad85ff0aa5cc/batch/runBatch.log",
+    # Bare filenames, NOT full instance paths - the batch EC2 instance gets replaced/
+    # autoscaled over time, and _run_stream()'s `@logStream like "text"` substring match
+    # keeps matching any instance's stream as long as the filename itself is right.
+    "application_batch": "application.log",
+    "run_batch": "runBatch.log",
 }
 
 # How far back each Logs Insights query should look.
