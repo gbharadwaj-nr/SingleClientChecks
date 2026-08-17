@@ -24,7 +24,7 @@ _FAILURE_KEYWORDS = ("fail", "error", "exception", "unavailable", "timeout")
 
 
 def _run_stream(logs_client, log_group: str, stream: str, lookback_minutes: int,
-                 limit: int = 20, message_filter: str | None = None) -> list[dict[str, str]]:
+                 limit: int = 20, message_filter: str | None = None, fallback: bool = False) -> list[dict[str, str]]:
     """Run a `fields @message, @timestamp` query restricted to one specific @logStream.
 
     Returns rows (most-recent-first) as {"@message": ..., "@timestamp": ...} dicts so
@@ -42,7 +42,17 @@ def _run_stream(logs_client, log_group: str, stream: str, lookback_minutes: int,
         f"| limit {limit}"
     )
     results = run_query(logs_client, log_group, query, lookback_minutes)
-    return extract_fields(results)
+    rows = extract_fields(results)
+    if not rows and fallback and lookback_minutes < _FALLBACK_LOOKBACK_MINUTES:
+        # No evidence in the requested window - fall back to a much longer lookback so a
+        # quiet day still surfaces the last known log line instead of an incorrect "no data" result.
+        results = run_query(logs_client, log_group, query, _FALLBACK_LOOKBACK_MINUTES)
+        rows = extract_fields(results)
+    return rows
+
+
+# Extended lookback used only when `fallback=True` and the requested window is empty.
+_FALLBACK_LOOKBACK_MINUTES = 43200  # 30 days
 
 
 def _evidence_lines(rows: list, limit: int = 5) -> list[str]:
@@ -68,6 +78,7 @@ def check_factiva_import(logs_client, log_group: str, lookback_minutes: int) -> 
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["norkom"], lookback_minutes,
         limit=20, message_filter="@message like /Processing Factiva PFA file/ or @message like /End of Factiva FPFA list import/",
+        fallback=True,
     )
     if not rows:
         return {"status": FAILED, "detail": "No Factiva import activity found in norkom.log"}
@@ -86,6 +97,7 @@ def check_etl(logs_client, log_group: str, lookback_minutes: int) -> dict:
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["get_dxv_landing_files"], lookback_minutes,
         limit=20, message_filter="@message like /ETL completed successfully/",
+        fallback=True,
     )
     if not rows:
         return {"status": FAILED, "detail": "No 'ETL completed successfully' activity found in getDXVLandingFiles.log"}
@@ -102,6 +114,7 @@ def check_runbatch_activity(logs_client, log_group: str, lookback_minutes: int) 
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
         limit=50, message_filter="@message like /Creating/",
+        fallback=True,
     )
     if not rows:
         return {"status": FAILED, "detail": "No 'Creating' activity found in runBatch.log"}
@@ -118,6 +131,7 @@ def check_acq_success_flag(logs_client, log_group: str, lookback_minutes: int) -
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
         limit=5, message_filter="@message like /acq_success/",
+        fallback=True,
     )
     if not rows:
         return {"status": FAILED, "detail": "No 'acq_success' flag activity found in runBatch.log"}

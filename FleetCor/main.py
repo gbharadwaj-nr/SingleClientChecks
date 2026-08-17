@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 # Keywords in a log message that indicate a check should be treated as failed.
 _FAILURE_KEYWORDS = ("fail", "error", "exception", "unavailable", "timeout")
 
+# Extended lookback used when the requested window has no log evidence, so a quiet day
+# still surfaces the last known log line instead of an incorrect "no data" result.
+_FALLBACK_LOOKBACK_MINUTES = 43200  # 30 days
+
 
 def _evaluate_stats_check(check: dict, results: list[list[dict]]) -> tuple[str, bool, list[str]]:
     """Evaluate a `stats`-style query (e.g. UI availability percentage) against a threshold."""
@@ -106,6 +110,11 @@ def evaluate_check(check: dict, session, all_regions: list[str], region_cache: d
         return status_label, passed, None, evidence
 
     messages = extract_messages(results)
+    if not messages and lookback_minutes < _FALLBACK_LOOKBACK_MINUTES:
+        # No evidence in the requested window - fall back to a much longer lookback so a
+        # quiet day still surfaces the last known log line instead of an incorrect "no data" result.
+        results = run_query(logs_client, check["log_group"], check["query"], _FALLBACK_LOOKBACK_MINUTES)
+        messages = extract_messages(results)
 
     if not messages:
         return check["failure_label"], False, None, None
