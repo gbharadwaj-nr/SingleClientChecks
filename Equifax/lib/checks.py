@@ -391,6 +391,7 @@ def check_rds_health(session, all_regions: list[str], lookback_minutes: int) -> 
 CHECK_FUNCTIONS = {
     "check_factiva_import": check_factiva_import,
     "check_acq_success_flag": check_acq_success_flag,
+    "check_acq_failure_flag": check_acq_failure_flag,
     "check_bad_records": check_bad_records,
     "check_rds_maintenance": check_rds_maintenance,
     "check_asg_health": check_asg_health,
