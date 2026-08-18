@@ -110,6 +110,15 @@ def evaluate_check(check: dict, session, all_regions: list[str], region_cache: d
         return status_label, passed, None, evidence
 
     messages = extract_messages(results)
+
+    if check.get("invert_presence"):
+        # e.g. ACQ Failure Flag: finding a match IS the failure signal, so an empty window is
+        # the healthy outcome - skip the "no evidence -> expand window" fallback below entirely,
+        # since widening a 24h failure check to 30 days would surface old, no-longer-relevant flags.
+        if not messages:
+            return check["success_label"], True, None, None
+        return check["failure_label"], False, _extract_detail(check, messages), messages[:5]
+
     if not messages and lookback_minutes < _FALLBACK_LOOKBACK_MINUTES:
         # No evidence in the requested window - fall back to a much longer lookback so a
         # quiet day still surfaces the last known log line instead of an incorrect "no data" result.

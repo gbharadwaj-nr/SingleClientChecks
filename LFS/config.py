@@ -49,11 +49,13 @@ CHECKS = [
     {"name": "RDS Pending Maintenance", "category": "Infra Checks", "func": "check_rds_maintenance", "kind": "aws_session"},
     {"name": "ASG Health", "category": "Infra Checks", "func": "check_asg_health", "kind": "aws_session"},
     {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
+    {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application", "lookback_minutes": 2880},
+    # Strict 24h window per user requirement, regardless of the 2-day lookback used elsewhere here.
+    {"name": "ACQ Failure Flag", "category": "Application", "func": "check_acq_failure_flag", "log_group": "application", "lookback_minutes": 1440},
     {"name": "Factiva Import", "category": "Application", "func": "check_factiva_import", "log_group": "application"},
+    {"name": "ETL", "category": "Application", "func": "check_etl", "log_group": "application"},
     # 2-day lookback per user request (vs the default 24h) so weekend/off-day gaps in
     # runBatch.log activity don't get flagged.
     {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application", "lookback_minutes": 2880},
-    {"name": "ETL", "category": "Application", "func": "check_etl", "log_group": "application"},
-    {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application", "lookback_minutes": 2880},
     {"name": "Bad Records", "category": "Application", "func": "check_bad_records", "log_group": "application", "lookback_minutes": 2880},
 ]
