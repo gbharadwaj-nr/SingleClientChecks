@@ -95,7 +95,7 @@ CHECKS = [
         "failure_label": "Not Created",
     },
     {
-        # Maps to the "runBatch.log" batch instance log stream (acq_failure flag creation) -
+        # Maps to the "runBatch.log" batch instance log stream (acq_fail flag creation) -
         # unlike ACQ Success Flag, FINDING this flag IS the failure signal (invert_presence).
         "name": "ACQ Failure Flag",
         "category": "Application",
@@ -103,12 +103,12 @@ CHECKS = [
         "query": (
             "fields @message\n"
             "| filter @logStream like /runBatch.log/\n"
-            "| filter @message like /acq_failure/\n"
+            "| filter @message like /acq_fail /\n"
             "| sort @timestamp desc\n"
             "| limit 5"
         ),
-        "detail_regex": r"(?i)(acq_failure_\S+?\.flag)",  # flag file name, e.g. acq_failure_20260812.flag
-        "detail_target": "status",  # shown as "Created (acq_failure_20260812.flag)"
+        "detail_regex": r"(?i)(acq_fail\S*\.flag)",  # flag file name, e.g. acq_fail_20260812.flag
+        "detail_target": "status",  # shown as "Created (acq_fail_20260812.flag)"
         "success_label": "Not Created",
         "failure_label": "Created",
         "invert_presence": True,
