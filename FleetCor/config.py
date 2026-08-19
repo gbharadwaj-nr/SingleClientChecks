@@ -95,27 +95,8 @@ CHECKS = [
         "failure_label": "Not Created",
     },
     {
-        # Maps to the "runBatch.log" batch instance log stream (acq_fail flag creation) -
-        # unlike ACQ Success Flag, FINDING this flag IS the failure signal (invert_presence).
-        "name": "ACQ Failure Flag",
-        "category": "Application",
-        "log_group": LOG_GROUPS["application"],
-        "query": (
-            "fields @message\n"
-            "| filter @logStream like /runBatch.log/\n"
-            "| filter @message like /acq_fail /\n"
-            "| sort @timestamp desc\n"
-            "| limit 5"
-        ),
-        "detail_regex": r"(?i)(acq_fail\S*\.flag)",  # flag file name, e.g. acq_fail_20260812.flag
-        "detail_target": "status",  # shown as "Created (acq_fail_20260812.flag)"
-        "success_label": "Not Created",
-        "failure_label": "Created",
-        "invert_presence": True,
-        "lookback_minutes": 1440,  # strict 24h window per user requirement
-    },
-    {
-        # Maps to the "runBatch.log" batch instance log stream (aml_success flag creation).
+        # Maps to the "runBatch.log" batch instance log stream (aml_success flag creation) -
+        # occupies the "AML/WLM/CDD processing-success" slot in the report's priority order.
         "name": "AML Success Flag",
         "category": "Application",
         "log_group": LOG_GROUPS["application"],
@@ -130,6 +111,26 @@ CHECKS = [
         "detail_target": "status",  # shown as "Created (aml_success_20260812.flag)"
         "success_label": "Created",
         "failure_label": "Not Created",
+    },
+    {
+        # Maps to the "runBatch.log" batch instance log stream (any _fail_ flag - ACQ/AML/WLM/CDD or
+        # other job) - unlike ACQ Success Flag, FINDING this flag IS the failure signal (invert_presence).
+        "name": "ACQ Failure Flag",
+        "category": "Application",
+        "log_group": LOG_GROUPS["application"],
+        "query": (
+            "fields @message\n"
+            "| filter @logStream like /runBatch.log/\n"
+            "| filter @message like /_fail_/\n"
+            "| sort @timestamp desc\n"
+            "| limit 5"
+        ),
+        "detail_regex": r"(?i)(\S*_fail_\S*\.flag)",  # flag file name, e.g. acq_fail_20260812.flag
+        "detail_target": "status",  # shown as "Created (acq_fail_20260812.flag)"
+        "success_label": "Not Created",
+        "failure_label": "Created",
+        "invert_presence": True,
+        "lookback_minutes": 1440,  # strict 24h window per user requirement
     },
     {
         # Maps to the "runBatch.log" batch instance log stream (NetReveal BAD file copy/flag creation).
