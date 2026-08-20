@@ -110,16 +110,16 @@ def check_acq_success_flag(logs_client, log_group: str, lookback_minutes: int) -
 
 
 def check_acq_failure_flag(logs_client, log_group: str, lookback_minutes: int) -> dict:
-    """runBatch.log: verify no _fail_ flag (ACQ/AML/WLM/CDD or any) was created - presence IS the failure signal."""
+    """runBatch.log: verify no 'fail' text (ACQ/AML/WLM/CDD or any job) appears - presence IS the failure signal."""
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
-        limit=5, message_filter="@message like /_fail_/",
+        limit=5, message_filter="@message like /(?i)fail/",
     )
     if not rows:
-        return {"status": HEALTHY, "detail": "No '_fail_' flag activity found in runBatch.log"}
+        return {"status": HEALTHY, "detail": "No 'fail' activity found in runBatch.log"}
 
     latest = rows[0].get("@message", "")
-    match = re.search(r"(?i)(\S*_fail_\S*\.flag)", latest)
+    match = re.search(r"(?i)(\S*fail\S*)", latest)
     flag_name = match.group(1) if match else latest[:150]
     detail = f"Failure flag created ({flag_name}) - latest: {latest[:200]}"
     return {"status": FAILED, "detail": detail, "evidence": _evidence_lines(rows)}

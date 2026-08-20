@@ -47,5 +47,5 @@ CHECKS = [
     {"name": "ASG Health", "category": "Infra Checks", "func": "check_asg_health", "kind": "aws_session"},
     {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
     # 2-day lookback (vs the default 24h) so weekend/off-day gaps in pipeline activity don't get flagged.
-    {"name": "Pipeline", "category": "Application", "func": "check_pipeline", "log_group": "application", "lookback_minutes": 2880},
+    {"name": "Pipeline", "category": "Application", "func": "check_pipeline", "log_group": "application", "lookback_minutes": 1440},
 ]

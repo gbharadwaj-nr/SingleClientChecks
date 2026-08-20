@@ -59,7 +59,7 @@ INFRA_NAME_FILTER = ("mgl", "production")
 #   "standalone"      -> func(lookback_minutes); no AWS calls at all (e.g. a DB connection)
 # All must return {"status": "Healthy"|"Warning"|"Failed", "detail": str}.
 CHECKS = [
-    {"name": "UI Availability", "category": "Infra Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 180},
+    {"name": "UI Availability", "category": "Infra Checks", "func": "check_ui_availability", "log_group": "ui", "lookback_minutes": 1440},
     {"name": "EC2 Instances", "category": "Infra Checks", "func": "check_ec2_health", "kind": "aws_session"},
     {"name": "RDS", "category": "Infra Checks", "func": "check_rds_health", "kind": "aws_session"},
     {"name": "RDS Pending Maintenance", "category": "Infra Checks", "func": "check_rds_maintenance", "kind": "aws_session"},
@@ -68,7 +68,7 @@ CHECKS = [
     {"name": "World-Check Import", "category": "Application", "func": "check_worldcheck_import", "log_group": "application"},
     {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application"},
     {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application"},
-    {"name": "ACQ Failure Flag", "category": "Application", "func": "check_acq_failure_flag", "log_group": "application", "lookback_minutes": 1440},
+    {"name": "Failure Flag", "category": "Application", "func": "check_acq_failure_flag", "log_group": "application", "lookback_minutes": 1440},
     {"name": "Bad Records", "category": "Application", "func": "check_bad_records", "log_group": "application"},
     # Database Validation is disabled until real MGL_DB_* connection details are provided -
     # re-add {"name": "Database Validation", "category": "Application", "func": "check_database_validation",

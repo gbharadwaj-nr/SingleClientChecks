@@ -48,7 +48,7 @@ CHECKS = [
     {"name": "EFS Health", "category": "Infra Checks", "func": "check_efs_health", "kind": "aws_session"},
     {"name": "ACQ Success Flag", "category": "Application", "func": "check_acq_success_flag", "log_group": "application"},
     {"name": "RunBatch Activity", "category": "Application", "func": "check_runbatch_activity", "log_group": "application"},
-    {"name": "ACQ Failure Flag", "category": "Application", "func": "check_acq_failure_flag", "log_group": "application", "lookback_minutes": 1440},
+    {"name": "Failure Flag", "category": "Application", "func": "check_acq_failure_flag", "log_group": "application", "lookback_minutes": 1440},
     # BAD-flagged entries in runBatch.log are rare, so this checks a wide 4-week window
     # (vs the default 24h) rather than a rolling daily one.
     {"name": "Bad Records", "category": "Application", "func": "check_bad_records", "log_group": "application", "lookback_minutes": 40320},

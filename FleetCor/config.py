@@ -38,7 +38,7 @@ CHECKS = [
             "| stats sum(@success) as UI_Is_Up_Count, sum(@fail) as UI_Is_Down_Count, "
             "sum(@success) / (sum(@fail) + sum(@success)) * 100 as UI_Availability_Percentage"
         ),
-        "lookback_minutes": 180,  # matches START=-10800s in the original console query
+        "lookback_minutes": 1440,  # 24h window
         "result_type": "stats",
         "stats_field": "UI_Availability_Percentage",
         "stats_threshold": 100.0,
@@ -113,19 +113,19 @@ CHECKS = [
         "failure_label": "Not Created",
     },
     {
-        # Maps to the "runBatch.log" batch instance log stream (any _fail_ flag - ACQ/AML/WLM/CDD or
-        # other job) - unlike ACQ Success Flag, FINDING this flag IS the failure signal (invert_presence).
-        "name": "ACQ Failure Flag",
+        # Maps to the "runBatch.log" batch instance log stream (any 'fail' text - ACQ/AML/WLM/CDD or
+        # other job) - unlike ACQ Success Flag, FINDING this text IS the failure signal (invert_presence).
+        "name": "Failure Flag",
         "category": "Application",
         "log_group": LOG_GROUPS["application"],
         "query": (
             "fields @message\n"
             "| filter @logStream like /runBatch.log/\n"
-            "| filter @message like /_fail_/\n"
+            "| filter @message like /(?i)fail/\n"
             "| sort @timestamp desc\n"
             "| limit 5"
         ),
-        "detail_regex": r"(?i)(\S*_fail_\S*\.flag)",  # flag file name, e.g. acq_fail_20260812.flag
+        "detail_regex": r"(?i)(\S*fail\S*)",  # e.g. acq_fail_20260812.flag, aml_fail, wlm_fail, cdd_fail
         "detail_target": "status",  # shown as "Created (acq_fail_20260812.flag)"
         "success_label": "Not Created",
         "failure_label": "Created",

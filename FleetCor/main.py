@@ -112,7 +112,7 @@ def evaluate_check(check: dict, session, all_regions: list[str], region_cache: d
     messages = extract_messages(results)
 
     if check.get("invert_presence"):
-        # e.g. ACQ Failure Flag: finding a match IS the failure signal, so an empty window is
+        # e.g. Failure Flag: finding a match IS the failure signal, so an empty window is
         # the healthy outcome - skip the "no evidence -> expand window" fallback below entirely,
         # since widening a 24h failure check to 30 days would surface old, no-longer-relevant flags.
         if not messages:
