@@ -339,9 +339,12 @@ def check_ec2_health(session, all_regions: list[str], lookback_minutes: int) -> 
 def check_rds_health(session, all_regions: list[str], lookback_minutes: int) -> dict:
     """Per-instance RDS health: engine, status, multi-AZ and storage utilization, across all regions.
 
-    Only DB instances whose identifier matches config.INFRA_NAME_FILTER are considered.
+    Matches DB instances whose identifier satisfies config.INFRA_NAME_FILTER, OR is
+    explicitly listed in config.RDS_INSTANCE_IDS (for identifiers that don't follow the
+    name-filter convention, e.g. AWS-auto-generated names).
     """
     name_filter = config.INFRA_NAME_FILTER
+    explicit_ids = getattr(config, "RDS_INSTANCE_IDS", ())
     db_instances = []
     for region in all_regions:
         rds = session.client("rds", region_name=region)
@@ -349,14 +352,15 @@ def check_rds_health(session, all_regions: list[str], lookback_minutes: int) -> 
             paginator = rds.get_paginator("describe_db_instances")
             for page in paginator.paginate():
                 for db in page.get("DBInstances", []):
-                    if _name_matches(db.get("DBInstanceIdentifier", ""), name_filter):
+                    identifier = db.get("DBInstanceIdentifier", "")
+                    if _name_matches(identifier, name_filter) or identifier in explicit_ids:
                         db_instances.append((region, db))
         except Exception:
             logger.exception("Failed to describe RDS instances in %s", region)
             continue
 
     if not db_instances:
-        return {"status": FAILED, "detail": f"No RDS instances matching '{name_filter}' found"}
+        return {"status": FAILED, "detail": f"No RDS instances matching '{name_filter}' or {explicit_ids} found"}
 
     details = []
     unhealthy_total = 0

@@ -37,6 +37,11 @@ QUERY_LOOKBACK_MINUTES = 1440  # 24 hours
 # to find IAG's production resources - e.g. "iag-production-compute...".
 INFRA_NAME_FILTER = ("iag", "production")
 
+# IAG's real RDS instance identifier is AWS-auto-generated and doesn't contain "iag"/
+# "production", so INFRA_NAME_FILTER alone never matches it - check_rds_health also
+# matches any identifier listed here.
+RDS_INSTANCE_IDS = ("ie1sf2gksw3c3wb",)
+
 # Each entry wires a check's independent function (lib/checks.py) into the report.
 # category groups rows into report sections - every client standardizes on exactly two:
 # "Infra Checks" (EC2/RDS/ASG/EFS - same across all clients) and "Application" (everything
