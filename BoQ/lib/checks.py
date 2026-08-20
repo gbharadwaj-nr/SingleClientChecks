@@ -111,9 +111,11 @@ def check_runbatch_activity(logs_client, log_group: str, lookback_minutes: int) 
 
 def check_acq_success_flag(logs_client, log_group: str, lookback_minutes: int) -> dict:
     """runBatch.log: verify the acq_success flag file was created."""
+    # Each flag creation logs 3 lines (Acquisition Successful / Creating / created), so a
+    # generous limit is needed to surface every distinct flag instance, not just the newest one.
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
-        limit=5, message_filter="@message like /acq_success/",
+        limit=30, message_filter="@message like /acq_success/",
         fallback=True,
     )
     if not rows:
@@ -125,7 +127,7 @@ def check_acq_success_flag(logs_client, log_group: str, lookback_minutes: int) -
     match = re.search(r"(?i)(acq_success\S*\.flag)", latest)
     flag_name = match.group(1) if match else latest[:150]
     detail = f"Not Created - latest: {latest[:200]}" if has_failure else f"Created ({flag_name})"
-    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows)}
+    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
 
 
 def check_acq_failure_flag(logs_client, log_group: str, lookback_minutes: int) -> dict:
