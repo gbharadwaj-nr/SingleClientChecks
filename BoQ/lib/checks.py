@@ -66,6 +66,27 @@ def _evidence_lines(rows: list, limit: int = 5) -> list[str]:
     return lines
 
 
+def _limit_to_recent_window(rows: list[dict], minutes: int) -> list[dict]:
+    """Keep only rows within `minutes` of the newest row - trims a fallback's multi-day history down to one day."""
+    if not rows:
+        return rows
+    try:
+        newest = datetime.strptime(rows[0]["@timestamp"], "%Y-%m-%d %H:%M:%S.%f")
+    except (KeyError, ValueError):
+        return rows
+    cutoff = newest - timedelta(minutes=minutes)
+    kept = []
+    for row in rows:
+        try:
+            ts = datetime.strptime(row["@timestamp"], "%Y-%m-%d %H:%M:%S.%f")
+        except (KeyError, ValueError):
+            kept.append(row)
+            continue
+        if ts >= cutoff:
+            kept.append(row)
+    return kept
+
+
 def _name_matches(name: str, filters) -> bool:
     """True if every substring in `filters` (a str, or list/tuple of strs) appears in `name`."""
     required = [filters] if isinstance(filters, str) else list(filters)
@@ -80,6 +101,7 @@ def check_factiva_import(logs_client, log_group: str, lookback_minutes: int) -> 
         limit=20, message_filter="@message like /Processing Factiva PFA file/ or @message like /End of Factiva FPFA list import/",
         fallback=True,
     )
+    rows = _limit_to_recent_window(rows, lookback_minutes)
     if not rows:
         return {"status": FAILED, "detail": "No Factiva import activity found in application.log"}
 
