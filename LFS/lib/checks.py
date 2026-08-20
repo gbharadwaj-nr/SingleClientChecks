@@ -111,9 +111,11 @@ def check_etl(logs_client, log_group: str, lookback_minutes: int) -> dict:
 
 def check_runbatch_activity(logs_client, log_group: str, lookback_minutes: int) -> dict:
     """runBatch.log: batch file/flag creation activity - lists every matching log line."""
+    # WLM logs "Creating X flag file...", but AML only logs "Feedback file X.flag created." -
+    # matching on "Creating" alone silently drops AML's completion lines.
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["run_batch"], lookback_minutes,
-        limit=50, message_filter="@message like /Creating/",
+        limit=50, message_filter="@message like /Creating/ or @message like /(?i)flag created/",
         fallback=True,
     )
     if not rows:
