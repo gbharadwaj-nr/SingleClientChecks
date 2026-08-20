@@ -55,10 +55,10 @@ def _run_stream(logs_client, log_group: str, stream: str, lookback_minutes: int,
 _FALLBACK_LOOKBACK_MINUTES = 43200  # 30 days
 
 
-def _evidence_lines(rows: list, limit: int = 5) -> list[str]:
-    """Format up to `limit` raw log rows (dicts) or plain message strings for the HTML evidence panel."""
+def _evidence_lines(rows: list, limit: int | None = None) -> list[str]:
+    """Format raw log rows (dicts) or plain message strings for the HTML evidence panel; `limit=None` shows all rows."""
     lines = []
-    for item in rows[:limit]:
+    for item in (rows if limit is None else rows[:limit]):
         if isinstance(item, dict):
             lines.append(f"{item.get('@timestamp', '')} {item.get('@message', '')}".strip())
         else:
@@ -123,7 +123,7 @@ def check_payment_fraud(logs_client, log_group: str, lookback_minutes: int) -> d
     has_failure = any(keyword in m.lower() for m in messages for keyword in _FAILURE_KEYWORDS)
     plural = "y" if len(rows) == 1 else "ies"
     detail = f"{len(rows)} payment fraud completion entr{plural} - latest: {messages[0][:200]}"
-    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows)}
+    return {"status": FAILED if has_failure else HEALTHY, "detail": detail, "evidence": _evidence_lines(rows, limit=len(rows))}
 
 
 def check_acq_success_flag(logs_client, log_group: str, lookback_minutes: int) -> dict:

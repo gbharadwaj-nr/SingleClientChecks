@@ -55,10 +55,10 @@ def _run_stream(logs_client, log_group: str, stream: str, lookback_minutes: int,
 _FALLBACK_LOOKBACK_MINUTES = 43200  # 30 days
 
 
-def _evidence_lines(rows: list, limit: int = 5) -> list[str]:
-    """Format up to `limit` raw log rows (dicts) or plain message strings for the HTML evidence panel."""
+def _evidence_lines(rows: list, limit: int | None = None) -> list[str]:
+    """Format raw log rows (dicts) or plain message strings for the HTML evidence panel; `limit=None` shows all rows."""
     lines = []
-    for item in rows[:limit]:
+    for item in (rows if limit is None else rows[:limit]):
         if isinstance(item, dict):
             lines.append(f"{item.get('@timestamp', '')} {item.get('@message', '')}".strip())
         else:
