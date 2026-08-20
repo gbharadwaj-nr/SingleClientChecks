@@ -77,7 +77,7 @@ def check_worldcheck_import(logs_client, log_group: str, lookback_minutes: int) 
     """application.log: World-Check file processing (start) and import-completion activity."""
     rows = _run_stream(
         logs_client, log_group, config.LOG_STREAMS["application_batch"], lookback_minutes,
-        limit=20, message_filter="@message like /Processing World-Check file - Start/ or @message like /End of Worldcheck List import/",
+        limit=20, message_filter="@message like /Starting import of Worldcheck lists/ or @message like /End of Worldcheck List import/",
         fallback=True,
     )
     if not rows:

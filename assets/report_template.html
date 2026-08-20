@@ -23,17 +23,6 @@
         </div>
     </header>
 
-    {% if batch_alert_rows %}
-    <div class="batch-alert-banner">
-        <span class="batch-alert-banner__title">&#128680; Batch/Application Failure Alert</span>
-        <ul class="batch-alert-banner__list">
-            {% for row in batch_alert_rows %}
-            <li><strong>{{ row.cells[0] }}</strong> &mdash; {{ row.cells[1] }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
     <main>
         {% for section in sections %}
         <section class="report-section">
